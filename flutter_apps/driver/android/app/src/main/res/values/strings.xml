@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Chalao (চালাও • चलाओ)</string>
+    <string name="title_activity_main">Chalao</string>
+    <string name="package_name">coop.chalao.app</string>
+    <string name="custom_url_scheme">chalao</string>
+</resources>
