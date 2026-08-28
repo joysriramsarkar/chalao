@@ -49,3 +49,14 @@ ios/App/build/
 ios/App/*.xcworkspace/xcuserdata/
 ios/App/*.xcodeproj/xcuserdata/
 ios/App/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+flutter_apps/**/build/
+flutter_apps/**/.dart_tool/
+flutter_apps/**/.flutter-plugins
+flutter_apps/**/.flutter-plugins-dependencies
+flutter_apps/**/local.properties

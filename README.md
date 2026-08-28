@@ -7,74 +7,106 @@
 
 ---
 
-## 📱 Complete 6 Native Mobile Applications Suite
+## 📱 Complete Multi-App Architecture
 
-The project includes **3 standalone dedicated applications**, each with native **Android (APK/Gradle)** and **Apple iOS (Xcode/CocoaPods)** projects:
+The platform consists of **3 dedicated applications** across Android and iOS:
 
-| Application | Android App (APK) | Apple iOS Project | App ID |
-|---|---|---|---|
-| **🚗 ১. গ্রাহক / যাত্রী অ্যাপ (Rider App)** | [Chalao-Rider-v1.0.0-debug.apk](./Chalao-Rider-v1.0.0-debug.apk) ([`apps/rider/android`](./apps/rider/android)) | [`apps/rider/ios`](./apps/rider/ios) | `coop.chalao.rider` |
-| **🚖 ২. চালক / পার্টনার অ্যাপ (Driver App)** | [Chalao-Driver-v1.0.0-debug.apk](./Chalao-Driver-v1.0.0-debug.apk) ([`apps/driver/android`](./apps/driver/android)) | [`apps/driver/ios`](./apps/driver/ios) | `coop.chalao.driver` |
-| **🏛️ ৩. অ্যাডমিন ও অপারেশন ডেস্ক (Admin App)** | [Chalao-Admin-v1.0.0-debug.apk](./Chalao-Admin-v1.0.0-debug.apk) ([`apps/admin/android`](./apps/admin/android)) | [`apps/admin/ios`](./apps/admin/ios) | `coop.chalao.admin` |
+| Application | Technology | Android Project | Apple iOS Project | Package ID |
+|---|---|---|---|---|
+| **🚗 ১. গ্রাহক / যাত্রী অ্যাপ (Rider App)** | **Flutter (Dart)** | `flutter_apps/rider/android` | `flutter_apps/rider/ios` | `coop.chalao.rider` |
+| **🚖 ২. চালক / পার্টনার অ্যাপ (Driver App)** | **Flutter (Dart)** | `flutter_apps/driver/android` | `flutter_apps/driver/ios` | `coop.chalao.driver` |
+| **🏛️ ৩. অ্যাডমিন ও অপারেশন ডেস্ক (Admin App)** | **Capacitor + Next.js** | `apps/admin/android` | `apps/admin/ios` | `coop.chalao.admin` |
+
+---
+
+## 🗄️ Backend & Database Architecture
+
+- **Database**: **Neon Serverless PostgreSQL** (AWS ap-southeast-1 region)
+- **API Engine**: Next.js 14 App Router API Routes (`/api/*`)
+- **Authentication**: Phone Number + 6-Digit OTP (`/api/auth/send-otp`, `/api/auth/verify-otp`) with Edge-compatible JWT (via `jose`)
+- **Real-time Driver GPS**: `/api/driver/location`
+- **Ride Dispatch Engine**: `/api/rides`, `/api/rides/[id]` with 4-Digit Pickup PIN verification
+- **Driver Earnings & Instant UPI Payouts**: `/api/driver/earnings` with 8-10% transparent cooperative commission cap
+
+### Database Schema Tables:
+1. `users` — Riders, Drivers, Admins
+2. `otp_logs` — SMS OTP verification audit logs
+3. `driver_profiles` — KYC verification (Aadhaar, PAN, DL, RC), vehicle specs & rating
+4. `driver_locations` — Real-time latitude/longitude/heading coordinates
+5. `rides` — Ride bookings, statuses, fare calculations, OTP PINs, reviews
+6. `earnings` — Driver gross/commission/net breakdown with instant UPI payout status
+7. `saved_addresses` — Home/work/favorite locations
 
 ---
 
 ## 🌟 App Specific Features
 
-### 🚗 ১. Chalao Rider App (যাত্রী অ্যাপ):
+### 🚗 ১. Chalao Rider App (`flutter_apps/rider`):
 - **Phone OTP Login / Signup** with profile and emergency contact setup.
-- **City & Dropoff search** across Kolkata, Delhi NCR, Mumbai, Bengaluru, and Dhaka.
-- **Vehicle Tiers with 8-10% Co-op Transparent Fares**: Bike, Auto, Sedan, Pink (Women-Safe), Green EV, and Share.
-- **UPI (GPay / PhonePe / Paytm / BHIM)**, Cash, and Wallet payments.
-- **Live GPS Tracking & 4-Digit OTP PIN verification**.
-- **National Emergency 112 Hub & Live Trip Sharing**.
-- **Co-op Shareholder Center**: Share certificates and patronage rebates.
+- **Interactive OpenStreetMap** with live GPS positioning.
+- **6 Vehicle Categories**: Bike, Auto, Sedan, SUV, Green EV, and Pink (Women-Safe).
+- **Transparent Co-op Fares**: 9% platform fee with no predatory surge.
+- **Live Ride Tracking**: 5s driver polling, 4-digit pickup PIN display.
+- **Safety**: Instant 112 SOS emergency trigger.
+- **Post-Trip Flow**: Driver star rating + review + trip history.
 
-### 🚖 ২. Chalao Driver Partner App (চালক ককপিট অ্যাপ):
-- **Driver KYC Onboarding**: Aadhaar, PAN, Commercial DL, and Vehicle RC verification.
-- **Go Online / Offline toggle** with audio chimes.
-- **15s Audio Incoming Ride Offer Alert** guaranteeing **90-92% net earnings**.
-- **Turn-by-Turn GPS Navigation HUD**.
-- **Passenger 4-Digit OTP PIN verification** & Cash/UPI collection confirmation.
-- **Earnings & Instant UPI Payouts**: Direct bank withdraw to driver's UPI ID.
-- **Driver Fatigue Monitor**: Rest alerts after 4+ hours of driving.
+### 🚖 ২. Chalao Driver Partner App (`flutter_apps/driver`):
+- **Driver Cockpit**: Dark theme HUD designed for day & night driving.
+- **4-Step KYC Onboarding**: Aadhaar, PAN, DL, RC, Vehicle Specs, and UPI ID.
+- **Online/Offline Switch** with automatic 15s GPS tracking.
+- **15s Incoming Ride Alert** with countdown timer and audio chime.
+- **4-Digit Passenger PIN Verification** before trip starts.
+- **Earnings Dashboard**: Today/Week/Month metrics with instant UPI payout requests.
 
-### 🏛️ ৩. Chalao Admin & Dispatch Desk (অ্যাডমিন অ্যাপ):
-- **Live Fleet Map & Dispatch Radar**.
-- **Driver KYC Verification Queue** (Approve / Reject DL & Aadhaar).
-- **8-10% Commission Cap Engine** & Dynamic Pricing Rules.
-- **National Emergency 112 SOS Incident Dispatch Desk**.
-- **Cooperative Financial Transparency Ledger & MSCS Act Ballot Management**.
+### 🏛️ ৩. Chalao Admin & Dispatch Desk (`apps/admin`):
+- **Fleet Command Center**: Live interactive radar of active drivers and ongoing rides.
+- **KYC Verification Queue**: Approve/reject driver documents.
+- **Commission Cap Engine**: Real-time enforcement of 8-10% cooperative margins.
+- **Transparency Ledger**: Public audit of co-op revenue, expenses, and dividend distribution.
 
 ---
 
 ## 🛠️ Developer Commands
 
-### 1. Run Web Development Server
+### 1. Run Web & Backend Server
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) for Web Hub, `/rider` for Rider App, `/driver` for Driver App, and `/admin` for Admin Desk.
 
-### 2. Build All 3 Apps
+### 2. Run Database Migrations (Neon PostgreSQL)
 ```bash
-npm run build:all
+node scripts/migrate-neon.mjs
 ```
 
-### 3. Open in Android Studio or Xcode
+### 3. Build Flutter Mobile Apps
 ```bash
-# Open Rider App
-npm run rider:android
-npm run rider:ios
+# Build Rider APK
+cd flutter_apps/rider
+flutter pub get
+flutter build apk --debug
 
-# Open Driver App
-npm run driver:android
-npm run driver:ios
+# Build Driver APK
+cd flutter_apps/driver
+flutter pub get
+flutter build apk --debug
+```
 
-# Open Admin App
+### 4. Build Admin App (Capacitor)
+```bash
+npm run admin:sync
 npm run admin:android
-npm run admin:ios
 ```
+
+---
+
+## 🚀 CI/CD Automated Builds (GitHub Actions)
+
+The repository includes automated CI/CD pipelines in `.github/workflows/`:
+1. `ci.yml` — Compiles and validates the Next.js web application and API endpoints.
+2. `android-build.yml` — Automatically builds and uploads all Android APK artifacts:
+   - `Chalao-Rider-v1.0.0-Flutter-APK`
+   - `Chalao-Driver-v1.0.0-Flutter-APK`
+   - `Chalao-Admin-v1.0.0-Capacitor-APK`
 
 ---
 
