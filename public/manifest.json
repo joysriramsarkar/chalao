@@ -1,0 +1,48 @@
+{
+  "name": "Chalao (চালাও • चलाओ) Cooperative Ride-Sharing",
+  "short_name": "Chalao চালাও",
+  "description": "Cooperative Ride-Sharing Platform for India & South Asia. Those who drive, those who ride, are the owners.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#059669",
+  "orientation": "portrait",
+  "categories": ["travel", "navigation", "transportation"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Book Ride (যাত্রী)",
+      "url": "/?role=rider",
+      "description": "Book nearest cooperative ride"
+    },
+    {
+      "name": "Driver Cockpit (চালক)",
+      "url": "/?role=driver",
+      "description": "Go online and accept rides"
+    },
+    {
+      "name": "112 SOS Emergency (জরুরি)",
+      "url": "/?action=sos",
+      "description": "National Emergency 112 Safety Hub"
+    }
+  ]
+}
