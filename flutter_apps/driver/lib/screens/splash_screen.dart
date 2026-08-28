@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
-import '../services/api_service.dart';
 
 // ─── Splash Screen ──────────────────────────────────────────────────────────
 class SplashScreen extends StatefulWidget {

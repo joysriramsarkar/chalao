@@ -52,13 +52,15 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
     try {
       // Simple distance estimate (production: use routing API)
       const distanceKm = 5.0;
+      final pickupLat = (_args['pickupLat'] as num).toDouble();
+      final pickupLng = (_args['pickupLng'] as num).toDouble();
       final result = await ApiService.requestRide(
         vehicleType: _args['vehicleType'] as String? ?? 'sedan',
-        pickupLat: _args['pickupLat'] as double,
-        pickupLng: _args['pickupLng'] as double,
+        pickupLat: pickupLat,
+        pickupLng: pickupLng,
         pickupAddress: _args['pickupAddress'] as String,
-        dropoffLat: _args['pickupLat'] as double + 0.05, // placeholder
-        dropoffLng: _args['pickupLng'] as double + 0.05,
+        dropoffLat: pickupLat + 0.05,
+        dropoffLng: pickupLng + 0.05,
         dropoffAddress: _dropoffAddress,
         paymentMethod: _paymentMethod,
         distanceKm: distanceKm,

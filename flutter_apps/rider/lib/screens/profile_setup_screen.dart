@@ -26,11 +26,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         emergencyContact: _emergencyPhoneController.text.trim(),
         emergencyName: _emergencyNameController.text.trim(),
       );
-      final meResult = await ApiService.getMe();
       if (!mounted) return;
       // Update app state
       final appState = context.read<AppState>();
-      final user = appState.user!;
       // Refresh user
       await appState.tryAutoLogin();
       Navigator.pushReplacementNamed(context, '/home');
