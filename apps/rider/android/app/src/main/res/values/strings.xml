@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Chalao Rider</string>
+    <string name="title_activity_main">Chalao Rider</string>
+    <string name="package_name">coop.chalao.rider</string>
+    <string name="custom_url_scheme">coop.chalao.rider</string>
+</resources>

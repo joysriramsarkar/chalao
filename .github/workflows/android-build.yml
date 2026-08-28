@@ -1,4 +1,4 @@
-name: Chalao Android APK Build & Release
+name: Chalao Mobile Suite (All 6 Apps CI/CD)
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
-    name: Build Android APK
+  build-all-mobile-apps:
+    name: Build Rider, Driver & Admin APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -29,26 +29,53 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Root Dependencies
         run: npm install
 
-      - name: Build Next.js Static Export
-        run: npm run build
+      - name: Build Next.js & Prepare 3 Apps
+        run: npm run build:all
 
-      - name: Sync Capacitor Android
-        run: npx cap sync android
-
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x android/gradlew
-
-      - name: Build Android Debug APK
+      - name: Sync Rider App
         run: |
+          cd apps/rider
+          npx cap sync android
+          chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug
 
-      - name: Upload Android APK Artifact
+      - name: Sync Driver App
+        run: |
+          cd apps/driver
+          npx cap sync android
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Sync Admin App
+        run: |
+          cd apps/admin
+          npx cap sync android
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload Rider APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Chalao-Android-v1.0.0-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Chalao-Rider-v1.0.0-APK
+          path: apps/rider/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload Driver APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chalao-Driver-v1.0.0-APK
+          path: apps/driver/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload Admin APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chalao-Admin-v1.0.0-APK
+          path: apps/admin/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
