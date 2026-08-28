@@ -1,4 +1,4 @@
-export type Role = 'rider' | 'driver' | 'member' | 'admin' | 'simulator';
+export type Role = 'rider' | 'driver' | 'member' | 'admin';
 
 export type Language = 'bn' | 'hi' | 'en';
 
@@ -88,6 +88,8 @@ export interface Driver {
   aadhaarNumber?: string;
   panNumber?: string;
   rcNumber: string;
+  upiId?: string;
+  walletBalance: number;
 }
 
 export interface Rider {
@@ -101,11 +103,19 @@ export interface Rider {
   memberId?: string;
   sharesOwned: number;
   patronagePoints: number;
+  walletBalance: number;
   emergencyContact: {
     name: string;
     phone: string;
     relation: string;
   };
+  savedPlaces?: {
+    id: string;
+    label: string;
+    address: string;
+    lat: number;
+    lng: number;
+  }[];
 }
 
 export interface RideDetails {
@@ -134,6 +144,19 @@ export interface RideDetails {
   completedAt?: number;
   routePolyline?: [number, number][];
   currentPos?: [number, number];
+}
+
+export interface TripHistoryItem {
+  id: string;
+  date: string;
+  pickupName: string;
+  dropoffName: string;
+  vehicleType: VehicleType;
+  fare: number;
+  paymentMethod: string;
+  status: 'completed' | 'cancelled';
+  driverName?: string;
+  riderName?: string;
 }
 
 export interface CoOpMotion {

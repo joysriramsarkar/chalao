@@ -1,4 +1,4 @@
-import { Driver, Rider, VehicleOption, CoOpMotion, IncidentReport, PricingRule } from '../types';
+import { Driver, Rider, VehicleOption, CoOpMotion, IncidentReport, PricingRule, TripHistoryItem } from '../types';
 
 export const VEHICLE_OPTIONS: VehicleOption[] = [
   {
@@ -125,7 +125,9 @@ export const INITIAL_DRIVERS: Driver[] = [
     licenseNumber: 'WB02-20180019241',
     aadhaarNumber: 'XXXX-XXXX-8912',
     panNumber: 'ABCDE1234F',
-    rcNumber: 'WB-RC-2022-9901'
+    rcNumber: 'WB-RC-2022-9901',
+    upiId: 'subhashish@oksbi',
+    walletBalance: 3200
   },
   {
     id: 'd-kol-02',
@@ -152,7 +154,9 @@ export const INITIAL_DRIVERS: Driver[] = [
     licenseNumber: 'WB06-20200084512',
     aadhaarNumber: 'XXXX-XXXX-4512',
     panNumber: 'BNMPR4512K',
-    rcNumber: 'WB-RC-2023-1142'
+    rcNumber: 'WB-RC-2023-1142',
+    upiId: 'mousumi@okaxis',
+    walletBalance: 4150
   },
   {
     id: 'd-kol-03',
@@ -179,60 +183,9 @@ export const INITIAL_DRIVERS: Driver[] = [
     licenseNumber: 'WB04-20160098412',
     aadhaarNumber: 'XXXX-XXXX-9901',
     panNumber: 'SLMPK9901M',
-    rcNumber: 'WB-RC-2021-3419'
-  },
-  {
-    id: 'd-kol-04',
-    name: 'বিক্রমজিৎ সিং (Vikramjit Singh)',
-    phone: '+91 98333-55667',
-    cityId: 'kolkata',
-    photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    rating: 4.91,
-    totalTrips: 1120,
-    vehicleType: 'car',
-    vehicleModel: 'Maruti Suzuki Dzire Tour (White)',
-    plateNumber: 'WB 08 C 3456',
-    isOnline: true,
-    isBusy: false,
-    isMember: true,
-    memberId: 'CH-IN-0711',
-    lat: 22.5640,
-    lng: 88.3520,
-    verificationStatus: 'verified',
-    todayEarnings: 3200,
-    todayTrips: 6,
-    patronageAccrued: 790,
-    sharesOwned: 25,
-    licenseNumber: 'WB08-20190045129',
-    aadhaarNumber: 'XXXX-XXXX-3456',
-    panNumber: 'VKMSH3456T',
-    rcNumber: 'WB-RC-2022-7712'
-  },
-  {
-    id: 'd-kol-05',
-    name: 'রাজেশ কুমার খাঁ (Rajesh Khan)',
-    phone: '+91 98344-77889',
-    cityId: 'kolkata',
-    photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    rating: 4.82,
-    totalTrips: 450,
-    vehicleType: 'green',
-    vehicleModel: 'Ola S1 Pro Electric Scooter (Green)',
-    plateNumber: 'WB 02 EV 9012',
-    isOnline: true,
-    isBusy: false,
-    isMember: false,
-    lat: 22.5855,
-    lng: 88.4740,
-    verificationStatus: 'pending',
-    todayEarnings: 740,
-    todayTrips: 4,
-    patronageAccrued: 0,
-    sharesOwned: 0,
-    licenseNumber: 'WB02-20240091244',
-    aadhaarNumber: 'XXXX-XXXX-9012',
-    panNumber: 'RJSHK9012P',
-    rcNumber: 'WB-RC-2024-0012'
+    rcNumber: 'WB-RC-2021-3419',
+    upiId: 'salim.auto@paytm',
+    walletBalance: 5800
   }
 ];
 
@@ -247,12 +200,43 @@ export const INITIAL_RIDER: Rider = {
   memberId: 'CH-IN-M109',
   sharesOwned: 5,
   patronagePoints: 420,
+  walletBalance: 750,
   emergencyContact: {
     name: 'শ্রেয়সী মুখার্জি (স্ত্রী)',
     phone: '+91 98305-11223',
     relation: 'পরিবার'
-  }
+  },
+  savedPlaces: [
+    { id: 'sp-1', label: 'বাড়ি (Home)', address: 'পার্ক স্ট্রিট, কলকাতা', lat: 22.5519, lng: 88.3524 },
+    { id: 'sp-2', label: 'অফিস (Office)', address: 'সল্টলেক সেক্টর ৫ (আইটি হাব)', lat: 22.5804, lng: 88.4378 },
+    { id: 'sp-3', label: 'বিমানবন্দর (Airport)', address: 'নেতাজি সুভাষচন্দ্র বসু আন্তর্জাতিক বিমানবন্দর (CCU)', lat: 22.6547, lng: 88.4467 }
+  ]
 };
+
+export const INITIAL_TRIP_HISTORY: TripHistoryItem[] = [
+  {
+    id: 'CH-TRIP-8821',
+    date: '2026-08-28 14:20',
+    pickupName: 'পার্ক স্ট্রিট (অ্যালেন পার্ক)',
+    dropoffName: 'সল্টলেক সেক্টর ৫ (আইটি হাব)',
+    vehicleType: 'bike',
+    fare: 145,
+    paymentMethod: 'UPI (GPay)',
+    status: 'completed',
+    driverName: 'শুভাশিস রায় (Subhashish Roy)'
+  },
+  {
+    id: 'CH-TRIP-8790',
+    date: '2026-08-27 18:45',
+    pickupName: 'হাওড়া রেলওয়ে স্টেশন',
+    dropoffName: 'গড়িয়াহাট মোড়',
+    vehicleType: 'car',
+    fare: 290,
+    paymentMethod: 'Cash',
+    status: 'completed',
+    driverName: 'বিক্রমজিৎ সিং'
+  }
+];
 
 export const INITIAL_MOTIONS: CoOpMotion[] = [
   {
@@ -316,17 +300,6 @@ export const INITIAL_INCIDENTS: IncidentReport[] = [
     status: 'resolved',
     timestamp: '2026-08-28 16:30',
     severity: 'low'
-  },
-  {
-    id: 'inc-in-02',
-    rideId: 'CH-TRIP-IN-9014',
-    reporterRole: 'driver',
-    reporterName: 'শুভাশিস রায় (Subhashish)',
-    type: 'fare_dispute',
-    description: 'বৃষ্টির মধ্যে পিকআপ লোকেশনে পৌঁছানোর পর যাত্রী ৫ মিনিট ফোন তোলেননি, পরে ইউপিআই পেমেন্ট করেছেন।',
-    status: 'investigating',
-    timestamp: '2026-08-28 19:15',
-    severity: 'medium'
   }
 ];
 

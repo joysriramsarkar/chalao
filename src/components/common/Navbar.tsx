@@ -7,15 +7,15 @@ import { CityId } from '../../types';
 import { 
   Users, 
   Car, 
-  Vote, 
   ShieldAlert, 
   Volume2, 
   VolumeX, 
-  Globe, 
-  Layers, 
-  Sparkles,
-  MapPin
+  MapPin,
+  ArrowLeftRight,
+  LogOut,
+  Layers
 } from 'lucide-react';
+import { sound } from '../../services/audioService';
 
 interface NavbarProps {
   onOpenSafety: () => void;
@@ -33,34 +33,48 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
     getCurrencySymbol,
     isMuted, 
     setIsMuted, 
-    rider, 
-    motions 
+    rider,
+    currentDriver,
+    authRole,
+    logout
   } = useApp();
 
   const t = TRANSLATIONS[language];
-  const activeMotionsCount = motions.filter(m => m.status === 'active' && !m.myVote).length;
+  const isBn = language === 'bn';
+  const isHi = language === 'hi';
+
+  const handleToggleRole = () => {
+    sound.playClickSound();
+    if (role === 'rider') {
+      setRole('driver');
+    } else if (role === 'driver') {
+      setRole('rider');
+    } else {
+      setRole('rider');
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white transition-colors">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
+    <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white transition-colors shadow-lg">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5">
         <div className="flex items-center justify-between gap-2">
           
           {/* Logo & City Selector */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div 
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-900/40 ring-1 ring-emerald-400/30 cursor-pointer" 
-              onClick={() => setRole('rider')}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/30 cursor-pointer" 
+              onClick={() => setRole(authRole || 'rider')}
             >
-              <span className="text-xl font-black tracking-tighter text-white">চা</span>
+              <span className="text-lg sm:text-xl font-black text-white">চা</span>
             </div>
             
             <div>
-              <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setRole('rider')}>
-                <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent">
+              <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setRole(authRole || 'rider')}>
+                <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent">
                   {t.appName}
                 </h1>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
-                  CO-OP • {getCurrencySymbol()}
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  {role === 'driver' ? (isBn ? 'চালক' : 'Driver') : (isBn ? 'যাত্রী' : 'Rider')}
                 </span>
               </div>
 
@@ -82,102 +96,46 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
             </div>
           </div>
 
-          {/* Role Switcher Tabs */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
-            <button
-              onClick={() => setRole('rider')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                role === 'rider'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              {t.roleRider}
-            </button>
-
-            <button
-              onClick={() => setRole('driver')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                role === 'driver'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <Car className="w-3.5 h-3.5" />
-              {t.roleDriver}
-            </button>
-
-            <button
-              onClick={() => setRole('member')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold relative transition-all ${
-                role === 'member'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <Vote className="w-3.5 h-3.5" />
-              {t.roleMember}
-              {activeMotionsCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-1 right-1" />
-              )}
-            </button>
-
-            <button
-              onClick={() => setRole('admin')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                role === 'admin'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              {t.roleAdmin}
-            </button>
-
-            <button
-              onClick={() => setRole('simulator')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                role === 'simulator'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md shadow-amber-900/30'
-                  : 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              {t.roleSimulator}
-            </button>
-          </nav>
-
           {/* Quick Utility Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
+            {/* Quick Switch Between Rider and Driver App */}
+            <button
+              onClick={handleToggleRole}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all"
+              title="Switch App"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
+              <span>{role === 'rider' ? (isBn ? 'ড্রাইভার অ্যাপ' : 'Driver App') : (isBn ? 'গ্রাহক অ্যাপ' : 'Rider App')}</span>
+            </button>
+
             {/* Safety SOS Quick Action */}
             <button
               onClick={onOpenSafety}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/40 text-xs font-bold transition-all animate-pulse-subtle shadow-lg shadow-red-950/40"
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/40 text-xs font-bold transition-all shadow-md"
               title="National Emergency 112 / SOS Hub"
             >
               <ShieldAlert className="w-4 h-4 text-red-400" />
-              <span className="hidden sm:inline font-bold">112 SOS</span>
+              <span className="font-bold">112</span>
             </button>
 
             {/* Trilingual Switcher */}
-            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700 text-xs font-semibold">
+            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700 text-[11px] font-semibold">
               <button
                 onClick={() => setLanguage('bn')}
-                className={`px-2 py-1 rounded-lg transition-all ${language === 'bn' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-all ${language === 'bn' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
               >
                 বাংলা
               </button>
               <button
                 onClick={() => setLanguage('hi')}
-                className={`px-2 py-1 rounded-lg transition-all ${language === 'hi' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-all ${language === 'hi' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
               >
                 हिंदी
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-2 py-1 rounded-lg transition-all ${language === 'en' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-all ${language === 'en' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
               >
                 EN
               </button>
@@ -188,69 +146,24 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
               onClick={() => setIsMuted(!isMuted)}
               className={`p-2 rounded-xl border text-xs transition-all ${
                 isMuted
-                  ? 'bg-slate-800/50 text-slate-500 border-slate-700'
+                  ? 'bg-slate-800 text-slate-500 border-slate-700'
                   : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
               }`}
               title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
             >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Member Badge */}
-            {rider.isMember && (
-              <div 
-                onClick={() => setRole('member')}
-                className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-900/50 to-teal-900/50 border border-emerald-500/40 text-emerald-300 text-xs font-semibold cursor-pointer hover:border-emerald-400 transition-all"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping-slow" />
-                <span>{rider.memberId}</span>
-              </div>
-            )}
+            {/* Admin Desk Access */}
+            <button
+              onClick={() => setRole('admin')}
+              className="hidden md:flex p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all"
+              title="Admin & Operations Control Desk"
+            >
+              <Layers className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </div>
 
-        {/* Mobile Sub-Navigation Bar */}
-        <div className="flex lg:hidden items-center justify-between gap-1 mt-2 pt-2 border-t border-slate-800/60 overflow-x-auto pb-1 text-xs">
-          <button
-            onClick={() => setRole('rider')}
-            className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-medium ${
-              role === 'rider' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
-            }`}
-          >
-            {t.roleRider}
-          </button>
-          <button
-            onClick={() => setRole('driver')}
-            className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-medium ${
-              role === 'driver' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
-            }`}
-          >
-            {t.roleDriver}
-          </button>
-          <button
-            onClick={() => setRole('member')}
-            className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-medium ${
-              role === 'member' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
-            }`}
-          >
-            {t.roleMember}
-          </button>
-          <button
-            onClick={() => setRole('admin')}
-            className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-medium ${
-              role === 'admin' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
-            }`}
-          >
-            {t.roleAdmin}
-          </button>
-          <button
-            onClick={() => setRole('simulator')}
-            className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-bold ${
-              role === 'simulator' ? 'bg-amber-500 text-slate-950' : 'text-amber-400'
-            }`}
-          >
-            {t.roleSimulator}
-          </button>
         </div>
       </div>
     </header>

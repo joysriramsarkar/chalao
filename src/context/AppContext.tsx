@@ -15,7 +15,8 @@ import {
   IncidentReport, 
   PricingRule,
   VehicleOption,
-  CityConfig
+  CityConfig,
+  TripHistoryItem
 } from '../types';
 import { 
   INITIAL_DRIVERS, 
@@ -23,6 +24,7 @@ import {
   INITIAL_MOTIONS, 
   INITIAL_INCIDENTS, 
   INITIAL_PRICING_RULES, 
+  INITIAL_TRIP_HISTORY,
   VEHICLE_OPTIONS 
 } from '../data/initialState';
 import { INDIAN_CITIES, CITY_LOCATIONS } from '../data/locations';
@@ -44,11 +46,20 @@ interface AppContextType {
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
   
+  // Auth state
+  isAuthenticated: boolean;
+  authRole: 'rider' | 'driver' | null;
+  loginAsRider: (phone: string) => void;
+  loginAsDriver: (phone: string) => void;
+  registerDriver: (data: Partial<Driver>) => void;
+  logout: () => void;
+
   // Rider & Driver State
   rider: Rider;
   drivers: Driver[];
   currentDriver: Driver;
   activeRide: RideDetails | null;
+  tripHistory: TripHistoryItem[];
   pricingRules: PricingRule[];
   motions: CoOpMotion[];
   incidents: IncidentReport[];
@@ -71,6 +82,7 @@ interface AppContextType {
   // Driver Actions
   toggleDriverOnline: () => void;
   verifyDriverKyc: (driverId: string, status: 'verified' | 'rejected') => void;
+  requestDriverPayout: (amount: number) => boolean;
   
   // Member & Governance Actions
   castVote: (motionId: string, choice: 'yes' | 'no' | 'abstain') => void;
@@ -97,10 +109,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currency, setCurrency] = useState<Currency>('INR');
   const [isMuted, setIsMutedState] = useState<boolean>(false);
   
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>('rider');
+
   const [rider, setRider] = useState<Rider>(INITIAL_RIDER);
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
   const [currentDriverId, setCurrentDriverId] = useState<string>('d-kol-01');
   const [activeRide, setActiveRide] = useState<RideDetails | null>(null);
+  const [tripHistory, setTripHistory] = useState<TripHistoryItem[]>(INITIAL_TRIP_HISTORY);
   const [pricingRules, setPricingRules] = useState<PricingRule[]>(INITIAL_PRICING_RULES);
   const [motions, setMotions] = useState<CoOpMotion[]>(INITIAL_MOTIONS);
   const [incidents, setIncidents] = useState<IncidentReport[]>(INITIAL_INCIDENTS);
@@ -112,6 +129,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setRole = (newRole: Role) => {
     sound.playClickSound();
     setRoleState(newRole);
+    if (newRole === 'rider' || newRole === 'driver') {
+      setAuthRole(newRole);
+    }
+  };
+
+  const loginAsRider = (phone: string) => {
+    setIsAuthenticated(true);
+    setAuthRole('rider');
+    setRoleState('rider');
+    setRider(prev => ({ ...prev, phone: `+91 ${phone}` }));
+  };
+
+  const loginAsDriver = (phone: string) => {
+    setIsAuthenticated(true);
+    setAuthRole('driver');
+    setRoleState('driver');
+    const existing = drivers.find(d => d.phone.includes(phone));
+    if (existing) {
+      setCurrentDriverId(existing.id);
+    }
+  };
+
+  const registerDriver = (data: Partial<Driver>) => {
+    const newDriverId = `d-${cityId}-${Date.now().toString().slice(-4)}`;
+    const newDriver: Driver = {
+      id: newDriverId,
+      name: data.name || 'নতুন চালক',
+      phone: data.phone || '+91 98300-00000',
+      cityId,
+      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      rating: 5.0,
+      totalTrips: 0,
+      vehicleType: data.vehicleType || 'bike',
+      vehicleModel: data.vehicleModel || 'Motorbike',
+      plateNumber: data.plateNumber || 'WB 02 XX 0000',
+      isOnline: true,
+      isBusy: false,
+      isMember: true,
+      memberId: `CH-IN-D${Math.floor(1000 + Math.random() * 9000)}`,
+      lat: currentCity.center[0] + 0.005,
+      lng: currentCity.center[1] + 0.005,
+      verificationStatus: 'verified',
+      todayEarnings: 0,
+      todayTrips: 0,
+      patronageAccrued: 0,
+      sharesOwned: data.sharesOwned || 10,
+      licenseNumber: data.licenseNumber || 'DL-PENDING',
+      aadhaarNumber: data.aadhaarNumber,
+      panNumber: data.panNumber,
+      rcNumber: data.rcNumber || 'RC-PENDING',
+      upiId: data.upiId || 'driver@upi',
+      walletBalance: 0
+    };
+
+    setDrivers(prev => [newDriver, ...prev]);
+    setCurrentDriverId(newDriverId);
+    setIsAuthenticated(true);
+    setAuthRole('driver');
+    setRoleState('driver');
+  };
+
+  const logout = () => {
+    sound.playClickSound();
+    setIsAuthenticated(false);
+    setAuthRole(null);
   };
 
   const setLanguage = (lang: Language) => {
@@ -196,7 +278,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setActiveRide(newRide);
 
-    // After 1.2 seconds, trigger ride offer to nearest cooperative driver
     setTimeout(() => {
       setActiveRide(prev => {
         if (!prev || prev.status !== 'SEARCHING') return prev;
@@ -209,15 +290,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 1200);
   };
 
-  // Driver Accepts Ride
   const acceptRide = (driverId?: string) => {
     const targetDriver = driverId 
       ? drivers.find(d => d.id === driverId) || currentDriver 
       : currentDriver;
 
     sound.playTripStartedChime();
-    
-    // Mark driver as busy
     setDrivers(prev => prev.map(d => d.id === targetDriver.id ? { ...d, isBusy: true } : d));
 
     setActiveRide(prev => {
@@ -270,7 +348,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  // Simulated animated route movement during 'ONGOING'
   useEffect(() => {
     if (!activeRide || activeRide.status !== 'ONGOING' || !activeRide.routePolyline) return;
 
@@ -310,6 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               isBusy: false,
               todayEarnings: d.todayEarnings + prev.driverEarnings,
               todayTrips: d.todayTrips + 1,
+              walletBalance: d.walletBalance + prev.driverEarnings,
               patronageAccrued: d.patronageAccrued + Math.round(prev.platformFee * 0.35)
             };
           }
@@ -321,6 +399,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...r,
         patronagePoints: r.patronagePoints + Math.round(prev.fareAmount * 0.1)
       }));
+
+      // Add to trip history
+      const historyItem: TripHistoryItem = {
+        id: prev.id,
+        date: new Date().toLocaleString(),
+        pickupName: prev.pickup.nameBn,
+        dropoffName: prev.dropoff.nameBn,
+        vehicleType: prev.vehicleType,
+        fare: prev.fareAmount,
+        paymentMethod: prev.paymentMethod.toUpperCase(),
+        status: 'completed',
+        driverName: prev.driver?.name,
+        riderName: prev.riderName
+      };
+
+      setTripHistory(hist => [historyItem, ...hist]);
 
       return updated;
     });
@@ -371,6 +465,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const requestDriverPayout = (amount: number): boolean => {
+    if (currentDriver.walletBalance < amount) return false;
+    sound.playCashPing();
+    setDrivers(prev => prev.map(d => {
+      if (d.id === currentDriver.id) {
+        return { ...d, walletBalance: d.walletBalance - amount };
+      }
+      return d;
+    }));
+    return true;
+  };
+
   const castVote = (motionId: string, choice: 'yes' | 'no' | 'abstain') => {
     sound.playTripStartedChime();
     setMotions(prev => prev.map(m => {
@@ -389,12 +495,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const buyShares = (count: number) => {
     sound.playTripCompletedFanfare();
-    setRider(prev => ({
-      ...prev,
-      isMember: true,
-      memberId: prev.memberId || `CH-IN-M${Math.floor(1000 + Math.random() * 9000)}`,
-      sharesOwned: prev.sharesOwned + count
-    }));
+    if (authRole === 'driver') {
+      setDrivers(prev => prev.map(d => {
+        if (d.id === currentDriver.id) {
+          return { ...d, isMember: true, sharesOwned: d.sharesOwned + count };
+        }
+        return d;
+      }));
+    } else {
+      setRider(prev => ({
+        ...prev,
+        isMember: true,
+        memberId: prev.memberId || `CH-IN-M${Math.floor(1000 + Math.random() * 9000)}`,
+        sharesOwned: prev.sharesOwned + count
+      }));
+    }
   };
 
   const triggerSOS = (description: string = 'Emergency SOS triggered') => {
@@ -402,8 +517,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newIncident: IncidentReport = {
       id: `INC-112-${Date.now()}`,
       rideId: activeRide?.id || 'CH-SOS-MANUAL',
-      reporterRole: role === 'driver' ? 'driver' : 'rider',
-      reporterName: role === 'driver' ? currentDriver.name : rider.name,
+      reporterRole: authRole === 'driver' ? 'driver' : 'rider',
+      reporterName: authRole === 'driver' ? currentDriver.name : rider.name,
       type: 'sos',
       description,
       status: 'open',
@@ -438,10 +553,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         availableLocations,
         isMuted,
         setIsMuted,
+        isAuthenticated,
+        authRole,
+        loginAsRider,
+        loginAsDriver,
+        registerDriver,
+        logout,
         rider,
         drivers,
         currentDriver,
         activeRide,
+        tripHistory,
         pricingRules,
         motions,
         incidents,
@@ -455,6 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cancelRide,
         toggleDriverOnline,
         verifyDriverKyc,
+        requestDriverPayout,
         castVote,
         buyShares,
         triggerSOS,
