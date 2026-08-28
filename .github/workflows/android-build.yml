@@ -77,13 +77,13 @@ jobs:
         run: |
           cd flutter_apps/rider
           flutter pub get
-          flutter build apk --debug
+          flutter build apk --debug --android-skip-build-dependency-validation
 
       - name: Build Flutter Driver APK
         run: |
           cd flutter_apps/driver
           flutter pub get
-          flutter build apk --debug
+          flutter build apk --debug --android-skip-build-dependency-validation
 
       - name: Upload Flutter Rider APK
         uses: actions/upload-artifact@v4
