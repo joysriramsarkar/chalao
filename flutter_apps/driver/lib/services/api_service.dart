@@ -187,14 +187,22 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> requestPayout(double amount, {String? upiId}) async {
+  static Future<Map<String, dynamic>> requestPayout(dynamic amountOrUpi, [String? upiId]) async {
     final baseUrl = await getBaseUrl();
+    double? amount;
+    String? finalUpi;
+    if (amountOrUpi is num) {
+      amount = amountOrUpi.toDouble();
+      finalUpi = upiId;
+    } else if (amountOrUpi is String) {
+      finalUpi = amountOrUpi;
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/driver/earnings'),
       headers: await _headers(auth: true),
       body: jsonEncode({
-        'amount': amount,
-        if (upiId != null) 'upiId': upiId,
+        if (amount != null && amount > 0) 'amount': amount,
+        if (finalUpi != null) 'upiId': finalUpi,
       }),
     ).timeout(const Duration(seconds: 10));
     return _handleResponse(response);
