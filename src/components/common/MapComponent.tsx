@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LocationPoint, Driver } from '../../types';
 
+const CARTO_API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhIjoiYWNfbjk4enk5eXoiLCJqdGkiOiI4YmQ1ZjQ5YyJ9.ATAaA7HU9cW4xE8PPZFS8BvB4OeUUB6PhB62vK9h9h8';
+
 interface MapComponentProps {
   pickup?: LocationPoint | null;
   dropoff?: LocationPoint | null;
@@ -13,6 +15,7 @@ interface MapComponentProps {
   className?: string;
   zoomLevel?: number;
   centerCoords?: [number, number];
+  mapStyle?: 'voyager' | 'dark';
 }
 
 export const MapComponent: React.FC<MapComponentProps> = ({
@@ -24,7 +27,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   showDrivers = true,
   className = 'w-full h-full min-h-[300px]',
   zoomLevel = 13,
-  centerCoords = [22.5726, 88.3639] // Kolkata default
+  centerCoords = [22.5726, 88.3639], // Kolkata default
+  mapStyle = 'voyager'
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -54,8 +58,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           attributionControl: false
         });
 
-        // CartoDB Voyager Clean Tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        // CartoDB High-Res Licensed Tiles with API Key (Watermark-Free)
+        const tileUrl = mapStyle === 'dark'
+          ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?api_key=${CARTO_API_KEY}`
+          : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?api_key=${CARTO_API_KEY}`;
+
+        L.tileLayer(tileUrl, {
           maxZoom: 19,
           subdomains: 'abcd',
         }).addTo(map);
