@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, runMigrations } from '@/lib/db';
 
+export const revalidate = 0;
+
+function normalizePhoneNumber(raw: string): string {
+  if (!raw) return '';
+  let clean = raw.replace(/[^\d+]/g, '');
+  if (clean.startsWith('0091')) clean = '+91' + clean.slice(4);
+  if (clean.startsWith('0') && clean.length === 11) clean = '+91' + clean.slice(1);
+  if (/^91\d{10}$/.test(clean)) clean = '+' + clean;
+  if (/^\d{10}$/.test(clean)) clean = '+91' + clean;
+  if (!clean.startsWith('+') && clean.length >= 10) clean = '+' + clean;
+  return clean;
+}
+
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -10,11 +23,10 @@ export async function POST(req: NextRequest) {
     await runMigrations();
     const { phone, role = 'rider' } = await req.json();
 
-    if (!phone || !/^\+?[0-9]{10,15}$/.test(phone.replace(/[\s-]/g, ''))) {
+    const normalizedPhone = normalizePhoneNumber(phone || '');
+    if (!normalizedPhone || normalizedPhone.length < 10) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 });
     }
-
-    const normalizedPhone = phone.replace(/[\s-]/g, '');
 
     // Invalidate old OTPs
     await sql`

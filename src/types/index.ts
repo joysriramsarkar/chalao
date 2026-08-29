@@ -90,6 +90,17 @@ export interface Driver {
   rcNumber: string;
   upiId?: string;
   walletBalance: number;
+  // Document Photos
+  aadhaarPhotoUrl?: string | null;
+  panPhotoUrl?: string | null;
+  dlPhotoUrl?: string | null;
+  rcPhotoUrl?: string | null;
+  vehiclePhotoUrl?: string | null;
+  // Validation flags
+  isAadhaarValid?: boolean;
+  isPanValid?: boolean;
+  isDlValid?: boolean;
+  isRcValid?: boolean;
 }
 
 export interface Rider {

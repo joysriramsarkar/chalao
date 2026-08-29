@@ -13,17 +13,30 @@ import {
   Sliders, 
   FileCheck, 
   Activity, 
-  TrendingUp,
   Save,
   RefreshCw,
   Phone,
   Car,
   CreditCard,
   UserCheck,
-  Clock,
-  Check
+  Check,
+  Eye,
+  X,
+  FileText,
+  AlertCircle,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
+
+interface DocPreviewState {
+  title: string;
+  docNumber: string;
+  photoUrl: string | null;
+  isValid: boolean;
+  docType: 'dl' | 'rc' | 'aadhaar' | 'pan' | 'vehicle';
+  driverName: string;
+}
 
 export const AdminPortal: React.FC = () => {
   const { 
@@ -49,11 +62,11 @@ export const AdminPortal: React.FC = () => {
   const [editingPricing, setEditingPricing] = useState<PricingRule[]>(pricingRules);
   const [saveToast, setSaveToast] = useState(false);
   const [actionSuccessToast, setActionSuccessToast] = useState<string | null>(null);
+  const [docModal, setDocModal] = useState<DocPreviewState | null>(null);
 
   const pendingDrivers = drivers.filter(d => d.verificationStatus === 'pending');
   const verifiedDrivers = drivers.filter(d => d.verificationStatus === 'verified');
   const onlineDrivers = drivers.filter(d => d.isOnline);
-  const busyDrivers = drivers.filter(d => d.isBusy);
   const openIncidents = incidents.filter(i => i.status !== 'resolved');
 
   const handleSavePricing = () => {
@@ -159,7 +172,7 @@ export const AdminPortal: React.FC = () => {
             }`}
           >
             <FileCheck className="w-4 h-4" />
-            <span>{isBn ? 'চালক ও KYC অনুমোদন' : 'Driver KYC Verification'} ({pendingDrivers.length})</span>
+            <span>{isBn ? 'নথি যাচাই ও KYC অনুমোদন' : 'Document Verification & KYC'} ({pendingDrivers.length})</span>
           </button>
 
           <button
@@ -209,13 +222,13 @@ export const AdminPortal: React.FC = () => {
         </button>
       </div>
 
-      {/* Tab 1: KYC & Driver Registrations from Neon DB */}
+      {/* Tab 1: KYC & Driver Registrations with Document ID format & Photo Lightbox */}
       {activeTab === 'kyc' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
               <FileCheck className="w-4 h-4 text-sky-400" />
-              <span>{isBn ? 'নিবন্ধিত চালকগণের আবেদন তালিকা (Neon PostgreSQL Live)' : 'Registered Drivers Applications (Neon DB Live)'}</span>
+              <span>{isBn ? 'নিবন্ধিত চালকগণের ডকুমেন্টস ও KYC অনুমোদন কেন্দ্র (Neon DB Live)' : 'Driver Documents & KYC Verification Hub'}</span>
             </h3>
             <span className="text-xs text-slate-400">
               {pendingDrivers.length} অপেক্ষমান • {verifiedDrivers.length} অনুমোদিত
@@ -227,7 +240,7 @@ export const AdminPortal: React.FC = () => {
               <Car className="w-12 h-12 mx-auto text-slate-600 animate-bounce" />
               <div className="text-slate-300 font-bold">এখনও কোনো চালক নিবন্ধন করেননি</div>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                ড্রাইভার অ্যাপ থেকে OTP ভেরিফাই করে KYC সাবমিট করলেই চালকের তথ্য তাৎক্ষণিকভাবে এখানে চলে আসবে।
+                ড্রাইভার অ্যাপ থেকে OTP ভেরিফাই করে KYC সাবমিট করলেই চালকের তথ্য ও ডকুমেন্টের ছবি তাৎক্ষণিকভাবে এখানে চলে আসবে।
               </p>
             </div>
           ) : (
@@ -237,13 +250,20 @@ export const AdminPortal: React.FC = () => {
                 const isVerified = driver.verificationStatus === 'verified';
                 const isRejected = driver.verificationStatus === 'rejected';
 
+                // Format validation flags
+                const aadhaarValid = driver.isAadhaarValid ?? /^\d{12}$/.test((driver.aadhaarNumber || '').replace(/\s/g, ''));
+                const panValid = driver.isPanValid ?? /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test((driver.panNumber || '').trim().toUpperCase());
+                const dlValid = driver.isDlValid ?? /^[A-Z]{2}[0-9A-Z\s/-]{8,20}$/.test((driver.licenseNumber || '').trim().toUpperCase());
+                const rcValid = driver.isRcValid ?? /^[A-Z]{2}[0-9A-Z\s/-]{6,15}$/.test((driver.plateNumber || '').trim().toUpperCase());
+
                 return (
                   <div 
                     key={driver.id} 
-                    className={`p-5 bg-slate-900 border rounded-2xl transition-all shadow-xl ${
+                    className={`p-5 bg-slate-900 border rounded-2xl transition-all shadow-xl space-y-4 ${
                       isPending ? 'border-sky-500/60 ring-1 ring-sky-500/20 bg-slate-900/90' : 'border-slate-800'
                     }`}
                   >
+                    {/* Top Row: Driver Header & Actions */}
                     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                       
                       {/* Driver Avatar & Primary Info */}
@@ -272,7 +292,7 @@ export const AdminPortal: React.FC = () => {
                               {isPending ? 'অপেক্ষমান (In Review)' : isVerified ? 'অনুমোদিত (Approved)' : 'প্রত্যাখ্যাত (Rejected)'}
                             </span>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                              {driver.vehicleType?.toUpperCase() || 'SEDAN'}
+                              {driver.vehicleType?.toUpperCase() || 'BIKE'}
                             </span>
                           </div>
 
@@ -291,22 +311,6 @@ export const AdminPortal: React.FC = () => {
                               <span className="text-teal-300">UPI: {driver.upiId || '—'}</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* KYC Document Verification Badges */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full lg:w-auto text-[11px] font-mono">
-                        <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
-                          <span className="text-slate-500 block text-[9px] uppercase">Driving License</span>
-                          <span className="text-amber-300 font-bold">{driver.licenseNumber || 'DL-Pending'}</span>
-                        </div>
-                        <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
-                          <span className="text-slate-500 block text-[9px] uppercase">Vehicle RC</span>
-                          <span className="text-sky-300 font-bold">{driver.rcNumber || 'RC-Pending'}</span>
-                        </div>
-                        <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 col-span-2 sm:col-span-1">
-                          <span className="text-slate-500 block text-[9px] uppercase">Aadhaar / PAN</span>
-                          <span className="text-slate-300">{driver.aadhaarNumber || 'Aadhaar'} / {driver.panNumber || 'PAN'}</span>
                         </div>
                       </div>
 
@@ -338,11 +342,232 @@ export const AdminPortal: React.FC = () => {
                       </div>
 
                     </div>
+
+                    {/* Bottom Row: Document ID Format Verification & Photo Lightbox Previews */}
+                    <div className="pt-3 border-t border-slate-800/80">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-sky-400" />
+                          <span>নথি নম্বর ও সংযুক্ত ছবিসমূহ (Document Verification & Photos)</span>
+                        </span>
+                        <span className="text-slate-500 text-[10px] lowercase">ক্লিক করে ছবি বড় করে দেখুন</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        
+                        {/* 1. Driving License Card */}
+                        <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-amber-400 uppercase">ড্রাইভিং লাইসেন্স (DL)</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 ${
+                              dlValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {dlValid ? <ShieldCheck className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                              <span>{dlValid ? 'সঠিক ফরম্যাট' : 'ফরমেট চেক'}</span>
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-xs text-white truncate">
+                            {driver.licenseNumber || 'DL নম্বর নেই'}
+                          </div>
+                          <button
+                            onClick={() => setDocModal({
+                              title: 'ড্রাইভিং লাইসেন্স (Driving License)',
+                              docNumber: driver.licenseNumber || 'DL-Pending',
+                              photoUrl: driver.dlPhotoUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+                              isValid: dlValid,
+                              docType: 'dl',
+                              driverName: driver.name,
+                            })}
+                            className="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-lg text-[11px] font-bold text-sky-300 border border-slate-800 flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>ছবি দেখুন (View DL Photo)</span>
+                          </button>
+                        </div>
+
+                        {/* 2. Vehicle RC Card */}
+                        <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-sky-400 uppercase">গাড়ির RC বই (Vehicle RC)</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 ${
+                              rcValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {rcValid ? <ShieldCheck className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                              <span>{rcValid ? 'সঠিক ফরম্যাট' : 'ফরমেট চেক'}</span>
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-xs text-white truncate">
+                            {driver.rcNumber || driver.plateNumber || 'RC নম্বর নেই'}
+                          </div>
+                          <button
+                            onClick={() => setDocModal({
+                              title: 'গাড়ির রেজিস্ট্রেশন সার্টিফিকেট (RC)',
+                              docNumber: driver.rcNumber || driver.plateNumber || 'RC-Pending',
+                              photoUrl: driver.rcPhotoUrl || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800',
+                              isValid: rcValid,
+                              docType: 'rc',
+                              driverName: driver.name,
+                            })}
+                            className="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-lg text-[11px] font-bold text-sky-300 border border-slate-800 flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>ছবি দেখুন (View RC Photo)</span>
+                          </button>
+                        </div>
+
+                        {/* 3. Aadhaar Card */}
+                        <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-teal-400 uppercase">আধার কার্ড (Aadhaar)</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 ${
+                              aadhaarValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {aadhaarValid ? <ShieldCheck className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                              <span>{aadhaarValid ? '১২ ডিজিট ভ্যালিড' : 'ফরমেট চেক'}</span>
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-xs text-white truncate">
+                            {driver.aadhaarNumber || 'XXXX-XXXX-XXXX'}
+                          </div>
+                          <button
+                            onClick={() => setDocModal({
+                              title: 'আধার কার্ড (Aadhaar Card)',
+                              docNumber: driver.aadhaarNumber || 'XXXX-XXXX-XXXX',
+                              photoUrl: driver.aadhaarPhotoUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+                              isValid: aadhaarValid,
+                              docType: 'aadhaar',
+                              driverName: driver.name,
+                            })}
+                            className="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-lg text-[11px] font-bold text-sky-300 border border-slate-800 flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>ছবি দেখুন (Aadhaar Photo)</span>
+                          </button>
+                        </div>
+
+                        {/* 4. PAN Card */}
+                        <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-purple-400 uppercase">প্যান কার্ড (PAN Card)</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 ${
+                              panValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {panValid ? <ShieldCheck className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                              <span>{panValid ? 'PAN ফরম্যাট সঠিক' : 'ফরমেট চেক'}</span>
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-xs text-white truncate">
+                            {driver.panNumber || 'XXXXX0000X'}
+                          </div>
+                          <button
+                            onClick={() => setDocModal({
+                              title: 'প্যান কার্ড (PAN Card)',
+                              docNumber: driver.panNumber || 'XXXXX0000X',
+                              photoUrl: driver.panPhotoUrl || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
+                              isValid: panValid,
+                              docType: 'pan',
+                              driverName: driver.name,
+                            })}
+                            className="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-lg text-[11px] font-bold text-sky-300 border border-slate-800 flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>ছবি দেখুন (PAN Photo)</span>
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+
                   </div>
                 );
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Full-Screen Document Lightbox / Inspection Modal */}
+      {docModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl space-y-4">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-2">
+                  <span>{docModal.title}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                    docModal.isValid ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}>
+                    {docModal.isValid ? '✓ আইডি ফরম্যাট ভেরিফাইড' : '⚠️ ফরম্যাট চেক প্রয়োজন'}
+                  </span>
+                </h3>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  চালক: <span className="text-white font-semibold">{docModal.driverName}</span> • নথি নম্বর: <span className="text-amber-300 font-mono font-bold">{docModal.docNumber}</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setDocModal(null)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Document Photo Inspection Body */}
+            <div className="p-5 space-y-4">
+              <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 max-h-[380px] flex items-center justify-center">
+                {docModal.photoUrl ? (
+                  <img 
+                    src={docModal.photoUrl} 
+                    alt={docModal.title}
+                    className="w-full h-auto object-contain max-h-[360px]"
+                  />
+                ) : (
+                  <div className="p-12 text-center text-slate-500 space-y-2">
+                    <FileText className="w-12 h-12 mx-auto text-slate-600" />
+                    <div>কোনো ছবি আপলোড করা হয়নি</div>
+                  </div>
+                )}
+
+                <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/70 backdrop-blur-md rounded-lg text-[11px] font-mono text-emerald-400 border border-emerald-500/30">
+                  {docModal.docNumber}
+                </div>
+              </div>
+
+              {/* Document Details & Security Stamp */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>MoRTH & MSCS Co-op ভেরিফিকেশন মানদণ্ড অনুযায়ী নিরীক্ষিত</span>
+                </div>
+
+                {docModal.photoUrl && (
+                  <a 
+                    href={docModal.photoUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-bold"
+                  >
+                    <span>মূল ছবি খুলুন</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end gap-3">
+              <button
+                onClick={() => setDocModal(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 

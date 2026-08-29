@@ -16,14 +16,18 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   String? _error;
 
   Future<void> _sendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.length < 10) {
+    final rawPhone = _phoneController.text.trim();
+    String cleanDigits = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (cleanDigits.startsWith('91') && cleanDigits.length == 12) {
+      cleanDigits = cleanDigits.substring(2);
+    }
+    if (cleanDigits.length < 10) {
       setState(() => _error = 'সঠিক ১০ সংখ্যার মোবাইল নম্বর লিখুন');
       return;
     }
+    final fullPhone = '+91$cleanDigits';
     setState(() { _isLoading = true; _error = null; });
     try {
-      final fullPhone = '+91$phone';
       final result = await ApiService.sendOtp(fullPhone, role: 'rider');
       if (!mounted) return;
       Navigator.pushNamed(context, '/otp', arguments: {

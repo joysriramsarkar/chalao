@@ -70,6 +70,13 @@ export async function runMigrations() {
       )
     `;
 
+    // Ensure document photo columns exist
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS aadhaar_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS pan_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS dl_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS rc_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS vehicle_photo_url TEXT`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS driver_locations (
         driver_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

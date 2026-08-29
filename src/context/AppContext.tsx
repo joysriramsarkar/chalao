@@ -166,6 +166,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             rcNumber: d.vehicleNumber,
             upiId: d.upiId,
             walletBalance: 1250,
+            aadhaarPhotoUrl: d.aadhaarPhotoUrl,
+            panPhotoUrl: d.panPhotoUrl,
+            dlPhotoUrl: d.dlPhotoUrl,
+            rcPhotoUrl: d.rcPhotoUrl,
+            vehiclePhotoUrl: d.vehiclePhotoUrl,
+            isAadhaarValid: d.isAadhaarValid,
+            isPanValid: d.isPanValid,
+            isDlValid: d.isDlValid,
+            isRcValid: d.isRcValid,
           }));
           setDrivers(mappedDrivers);
         }
