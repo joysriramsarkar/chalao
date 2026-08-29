@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
+import '../config/map_config.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -88,7 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: MapConfig.cartoVoyagerUrl,
+                subdomains: MapConfig.subdomains,
                 userAgentPackageName: 'coop.chalao.rider',
               ),
               MarkerLayer(

@@ -34,6 +34,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       _phone = args['phone'] as String;
       _devOtp = args['devOtp'] as String?;
+      if (_devOtp != null && _otpCtrl.text.isEmpty) {
+        _otpCtrl.text = _devOtp!;
+      }
       _init = true;
     }
   }
@@ -67,7 +70,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       setState(() => _error = e.message);
       _otpCtrl.clear();
     } catch (_) {
-      setState(() => _error = 'যাচাই ব্যর্থ');
+      setState(() => _error = 'যাচাই ব্যর্থ। পুনরায় চেষ্টা করুন।');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,8 +82,8 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     final pinTheme = PinTheme(
-      width: 56, height: 62,
-      textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+      width: 50, height: 56,
+      textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(14),
@@ -89,40 +92,75 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('OTP যাচাই')),
+      appBar: AppBar(title: const Text('OTP যাচাইকরণ')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 24),
-              const Text('🔐', style: TextStyle(fontSize: 52)),
-              const SizedBox(height: 20),
-              const Text('OTP পাঠানো হয়েছে', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 8),
-              Text(_phone, style: TextStyle(color: Colors.white.withOpacity(0.5))),
+              const SizedBox(height: 16),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(child: Text('🔐', style: TextStyle(fontSize: 32))),
+              ),
+              const SizedBox(height: 16),
+              const Text('যাচাইকরণ কোড লিখুন', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 6),
+              Text('$_phone নম্বরে পাঠানো ৬ সংখ্যার কোড লিখুন', style: TextStyle(color: Colors.white.withOpacity(0.5))),
               if (_devOtp != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    color: const Color(0xFF064E3B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF10B981)),
                   ),
-                  child: Text('🛠️ Dev OTP: $_devOtp',
-                    style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisSize.center,
+                    children: [
+                      const Text('🔑 আপনার কোড: ', style: TextStyle(color: Colors.white70)),
+                      Text(
+                        _devOtp!,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF34D399),
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          _otpCtrl.text = _devOtp!;
+                          _verify(_devOtp!);
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        child: const Text('লগইন করুন', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-              const SizedBox(height: 40),
+              const SizedBox(height: 28),
               Pinput(
                 length: 6,
                 controller: _otpCtrl,
                 defaultPinTheme: pinTheme,
                 focusedPinTheme: pinTheme.copyWith(
                   decoration: pinTheme.decoration!.copyWith(
-                    border: Border.all(color: const Color(0xFF22D3EE), width: 2.5),
+                    border: Border.all(color: const Color(0xFF10B981), width: 2.5),
                   ),
                 ),
                 autofocus: true,
@@ -130,22 +168,35 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red[900]?.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                ),
               ],
-              const SizedBox(height: 32),
-              if (_loading) const CircularProgressIndicator(color: Color(0xFF22D3EE))
+              const SizedBox(height: 28),
+              if (_loading) const CircularProgressIndicator(color: Color(0xFF10B981))
               else ElevatedButton(
                 onPressed: () => _verify(_otpCtrl.text),
-                child: const Text('যাচাই করুন'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.black),
+                child: const Text('যাচাই ও প্রবেশ করুন', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               TextButton(
                 onPressed: _resend > 0 ? null : () async {
-                  await ApiService.sendOtp(_phone);
+                  final res = await ApiService.sendOtp(_phone);
+                  final newOtp = res['dev_otp'] as String?;
+                  setState(() {
+                    _devOtp = newOtp;
+                    if (newOtp != null) _otpCtrl.text = newOtp;
+                  });
                   _startTimer();
                 },
                 child: Text(_resend > 0 ? 'পুনরায় পাঠান ($_resend সেকেন্ড)' : 'পুনরায় OTP পাঠান',
-                  style: TextStyle(color: _resend > 0 ? Colors.white24 : const Color(0xFF22D3EE))),
+                  style: TextStyle(color: _resend > 0 ? Colors.white24 : const Color(0xFF10B981))),
               ),
             ],
           ),

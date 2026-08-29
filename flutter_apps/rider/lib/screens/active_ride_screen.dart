@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
 import '../services/api_service.dart';
+import '../config/map_config.dart';
 
 class ActiveRideScreen extends StatefulWidget {
   const ActiveRideScreen({super.key});
@@ -108,7 +109,8 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: MapConfig.cartoVoyagerUrl,
+                  subdomains: MapConfig.subdomains,
                   userAgentPackageName: 'coop.chalao.rider',
                 ),
                 if (hasDriver)

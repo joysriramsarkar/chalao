@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../widgets/server_settings_dialog.dart';
 
 class PhoneInputScreen extends StatefulWidget {
   const PhoneInputScreen({super.key});
@@ -17,7 +18,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   Future<void> _sendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.length < 10) {
-      setState(() => _error = 'সঠিক মোবাইল নম্বর লিখুন');
+      setState(() => _error = 'সঠিক ১০ সংখ্যার মোবাইল নম্বর লিখুন');
       return;
     }
     setState(() { _isLoading = true; _error = null; });
@@ -33,7 +34,8 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = 'সংযোগ সমস্যা। পুনরায় চেষ্টা করুন।');
+      final currentUrl = await ApiService.getBaseUrl();
+      setState(() => _error = 'সার্ভার সংযোগ ব্যর্থ ($currentUrl)। উপরের ⚙️ আইকন থেকে সার্ভার আইপি ঠিক আছে কিনা যাচাই করুন।');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -48,13 +50,24 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Color(0xFF6C3DF4)),
+            tooltip: 'সার্ভার সংযোগ কনফিগারেশন',
+            onPressed: () => ServerSettingsDialog.show(context),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
               // Logo
               Container(
                 width: 64,
@@ -67,7 +80,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                 ),
                 child: const Center(child: Text('🚗', style: TextStyle(fontSize: 32))),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               Text(
                 'আপনার মোবাইল নম্বর লিখুন',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -82,7 +95,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                   color: Colors.grey[600],
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
               // Phone field
               TextFormField(
                 controller: _phoneController,
@@ -116,6 +129,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     ),
                   ),
                   errorText: _error,
+                  errorMaxLines: 3,
                 ),
                 onChanged: (_) => setState(() => _error = null),
                 onFieldSubmitted: (_) => _sendOtp(),
