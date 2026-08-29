@@ -7,7 +7,7 @@ import { Navbar } from '@/components/common/Navbar';
 import { SafetyModal } from '@/components/safety/SafetyModal';
 
 const AdminAppWrapper: React.FC = () => {
-  const { setRole } = useApp();
+  const { setRole, refreshDrivers, isRefreshing } = useApp();
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
 
   React.useEffect(() => {
@@ -16,7 +16,11 @@ const AdminAppWrapper: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500">
-      <Navbar onOpenSafety={() => setIsSafetyOpen(true)} />
+      <Navbar 
+        onOpenSafety={() => setIsSafetyOpen(true)} 
+        onRefresh={() => refreshDrivers()} 
+        isRefreshing={isRefreshing}
+      />
       <main className="flex-1 py-3 sm:py-5">
         <AdminPortal />
       </main>

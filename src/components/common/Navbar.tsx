@@ -5,76 +5,55 @@ import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { CityId } from '../../types';
 import { 
-  Users, 
-  Car, 
   ShieldAlert, 
   Volume2, 
   VolumeX, 
   MapPin,
-  ArrowLeftRight,
-  LogOut,
-  Layers
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
 
 interface NavbarProps {
-  onOpenSafety: () => void;
+  onOpenSafety?: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefreshing }) => {
   const { 
-    role, 
-    setRole, 
     language, 
     setLanguage, 
     currentCity, 
     setCityId, 
     availableCities, 
-    getCurrencySymbol,
     isMuted, 
-    setIsMuted, 
-    rider,
-    currentDriver,
-    authRole,
-    logout
+    setIsMuted,
   } = useApp();
 
   const t = TRANSLATIONS[language];
   const isBn = language === 'bn';
   const isHi = language === 'hi';
 
-  const handleToggleRole = () => {
-    sound.playClickSound();
-    if (role === 'rider') {
-      setRole('driver');
-    } else if (role === 'driver') {
-      setRole('rider');
-    } else {
-      setRole('rider');
-    }
-  };
-
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white transition-colors shadow-lg">
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
         <div className="flex items-center justify-between gap-2">
           
-          {/* Logo & City Selector */}
+          {/* Logo & Admin Branding */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div 
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/30 cursor-pointer" 
-              onClick={() => setRole(authRole || 'rider')}
-            >
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/30">
               <span className="text-lg sm:text-xl font-black text-white">চা</span>
             </div>
             
             <div>
-              <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setRole(authRole || 'rider')}>
+              <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent">
-                  {t.appName}
+                  {isBn ? 'চালাও অ্যাডমিন ও ফ্লিট সেন্টার' : isHi ? 'चलाओ व्यवस्थापक व नियंत्रण' : 'Chalao Admin & Operations'}
                 </h1>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                  {role === 'driver' ? (isBn ? 'চালক' : 'Driver') : (isBn ? 'যাত্রী' : 'Rider')}
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                  <Database className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>Neon DB</span>
                 </span>
               </div>
 
@@ -99,25 +78,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
           {/* Quick Utility Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
-            {/* Quick Switch Between Rider and Driver App */}
-            <button
-              onClick={handleToggleRole}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all"
-              title="Switch App"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
-              <span>{role === 'rider' ? (isBn ? 'ড্রাইভার অ্যাপ' : 'Driver App') : (isBn ? 'গ্রাহক অ্যাপ' : 'Rider App')}</span>
-            </button>
+            {/* Refresh Button */}
+            {onRefresh && (
+              <button
+                onClick={() => {
+                  sound.playClickSound();
+                  onRefresh();
+                }}
+                disabled={isRefreshing}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all"
+                title="রিফ্রেশ করুন"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isBn ? 'রিফ্রেশ' : 'Refresh'}</span>
+              </button>
+            )}
 
             {/* Safety SOS Quick Action */}
-            <button
-              onClick={onOpenSafety}
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/40 text-xs font-bold transition-all shadow-md"
-              title="National Emergency 112 / SOS Hub"
-            >
-              <ShieldAlert className="w-4 h-4 text-red-400" />
-              <span className="font-bold">112</span>
-            </button>
+            {onOpenSafety && (
+              <button
+                onClick={onOpenSafety}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/40 text-xs font-bold transition-all shadow-md"
+                title="National Emergency 112 / SOS Hub"
+              >
+                <ShieldAlert className="w-4 h-4 text-red-400" />
+                <span className="font-bold">112</span>
+              </button>
+            )}
 
             {/* Trilingual Switcher */}
             <div className="flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700 text-[11px] font-semibold">
@@ -152,15 +139,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety }) => {
               title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
             >
               {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-            </button>
-
-            {/* Admin Desk Access */}
-            <button
-              onClick={() => setRole('admin')}
-              className="hidden md:flex p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all"
-              title="Admin & Operations Control Desk"
-            >
-              <Layers className="w-3.5 h-3.5" />
             </button>
           </div>
 

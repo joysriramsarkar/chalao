@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { verifyToken, extractToken } from '@/lib/auth';
 
+export function generateStaticParams() {
+  return [{ id: '1' }];
+}
+
 type Params = { params: { id: string } };
 
 // GET /api/rides/[id]

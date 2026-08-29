@@ -60,3 +60,8 @@ flutter_apps/**/.dart_tool/
 flutter_apps/**/.flutter-plugins
 flutter_apps/**/.flutter-plugins-dependencies
 flutter_apps/**/local.properties
+flutter_apps/**/android/.gradle/
+flutter_apps/**/android/.kotlin/
+
+# Generated APKs
+apks/*.apk

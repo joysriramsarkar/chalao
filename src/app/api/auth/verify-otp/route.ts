@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
       INSERT INTO users (phone, role)
       VALUES (${normalizedPhone}, ${role})
       ON CONFLICT (phone) DO UPDATE
-        SET updated_at = NOW()
+        SET role = CASE WHEN ${role} = 'driver' THEN 'driver' ELSE users.role END,
+            updated_at = NOW()
       RETURNING id, phone, name, role, is_active, avatar_url, emergency_contact, emergency_name, created_at
     `;
 
@@ -62,15 +63,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Your account has been suspended. Contact support.' }, { status: 403 });
     }
 
-    // For drivers, check KYC
+    // For drivers, check or create initial KYC profile
     let driverProfile = null;
-    if (user.role === 'driver') {
+    if (user.role === 'driver' || role === 'driver') {
       const dp = await sql`
-        SELECT kyc_status, vehicle_type, upi_id, is_online, rating, total_rides
+        SELECT kyc_status, vehicle_type, vehicle_make, vehicle_model, dl_number, rc_number, upi_id, is_online, rating, total_rides
         FROM driver_profiles
         WHERE user_id = ${user.id}
       `;
-      driverProfile = dp[0] || null;
+      if (dp.length) {
+        driverProfile = dp[0];
+      } else {
+        const newDp = await sql`
+          INSERT INTO driver_profiles (user_id, kyc_status)
+          VALUES (${user.id}, 'pending')
+          RETURNING kyc_status, vehicle_type, vehicle_make, vehicle_model, dl_number, rc_number, upi_id, is_online, rating, total_rides
+        `;
+        driverProfile = newDp[0] || null;
+      }
     }
 
     const token = await generateToken({

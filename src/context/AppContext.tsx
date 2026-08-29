@@ -95,6 +95,10 @@ interface AppContextType {
   // Pricing Updates
   updatePricingRule: (rule: PricingRule) => void;
   
+  // Real DB Driver sync
+  refreshDrivers: () => Promise<void>;
+  isRefreshing: boolean;
+  
   // Helper
   getVehicleOption: (type: VehicleType) => VehicleOption;
   getCurrencySymbol: () => string;
@@ -103,15 +107,16 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRoleState] = useState<Role>('rider');
+  const [role, setRoleState] = useState<Role>('admin');
   const [language, setLanguageState] = useState<Language>('bn');
   const [cityId, setCityIdState] = useState<CityId>('kolkata');
   const [currency, setCurrency] = useState<Currency>('INR');
   const [isMuted, setIsMutedState] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>('rider');
+  const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>('admin' as any);
 
   const [rider, setRider] = useState<Rider>(INITIAL_RIDER);
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
@@ -125,6 +130,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currentCity = INDIAN_CITIES.find(c => c.id === cityId) || INDIAN_CITIES[0];
   const availableLocations = CITY_LOCATIONS.filter(l => l.cityId === cityId);
   const currentDriver = drivers.find(d => d.id === currentDriverId) || drivers[0];
+
+  const fetchDriversFromDb = async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch('/api/admin/drivers');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.drivers) && data.drivers.length > 0) {
+          const mappedDrivers: Driver[] = data.drivers.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            phone: d.phone,
+            cityId: 'kolkata',
+            photo: d.photoUrl,
+            rating: d.rating,
+            totalTrips: d.totalTrips,
+            vehicleType: (d.vehicleType as VehicleType) || 'bike',
+            vehicleModel: d.vehicleModel,
+            plateNumber: d.vehicleNumber,
+            isOnline: d.isOnline,
+            isBusy: d.isBusy,
+            isMember: true,
+            memberId: `CH-IN-D${d.dbId}`,
+            lat: d.location?.lat || 22.5726,
+            lng: d.location?.lng || 88.3639,
+            verificationStatus: d.verificationStatus,
+            todayEarnings: 0,
+            todayTrips: 0,
+            patronageAccrued: 0,
+            sharesOwned: 10,
+            licenseNumber: d.dlNumber,
+            aadhaarNumber: d.aadhaarNumber,
+            panNumber: d.panNumber,
+            rcNumber: d.vehicleNumber,
+            upiId: d.upiId,
+            walletBalance: 1250,
+          }));
+          setDrivers(mappedDrivers);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch drivers from Neon DB:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDriversFromDb();
+    const interval = setInterval(fetchDriversFromDb, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   const setRole = (newRole: Role) => {
     sound.playClickSound();
@@ -455,14 +512,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const verifyDriverKyc = (driverId: string, status: 'verified' | 'rejected') => {
+  const verifyDriverKyc = async (driverId: string, status: 'verified' | 'rejected') => {
     sound.playClickSound();
+    // Optimistic UI update
     setDrivers(prev => prev.map(d => {
       if (d.id === driverId) {
         return { ...d, verificationStatus: status };
       }
       return d;
     }));
+
+    try {
+      const res = await fetch('/api/admin/drivers/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId, status }),
+      });
+      if (res.ok) {
+        await fetchDriversFromDb();
+      }
+    } catch (e) {
+      console.error('Error verifying driver KYC in DB:', e);
+    }
   };
 
   const requestDriverPayout = (amount: number): boolean => {
@@ -583,6 +654,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerSOS,
         resolveIncident,
         updatePricingRule,
+        refreshDrivers: fetchDriversFromDb,
+        isRefreshing,
         getVehicleOption,
         getCurrencySymbol
       }}
