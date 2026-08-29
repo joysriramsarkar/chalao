@@ -140,6 +140,10 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> submitKyc(Map<String, dynamic> kycData) async {
+    return await submitDriverKyc(kycData);
+  }
+
   // ─── Location & Online Status ───────────────────
 
   static Future<Map<String, dynamic>> updateLocation({

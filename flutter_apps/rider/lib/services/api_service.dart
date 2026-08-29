@@ -177,6 +177,35 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> requestRide({
+    required String pickupAddress,
+    required double pickupLat,
+    required double pickupLng,
+    required String dropoffAddress,
+    required double dropoffLat,
+    required double dropoffLng,
+    required String vehicleType,
+    double? estimatedFare,
+    double distanceKm = 5.0,
+    int durationMin = 15,
+    String paymentMethod = 'cash',
+  }) async {
+    final fare = estimatedFare ?? ((vehicleType == 'bike' ? 25.0 : 50.0) + (distanceKm * 12.0));
+    return await createRide(
+      pickupAddress: pickupAddress,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      dropoffAddress: dropoffAddress,
+      dropoffLat: dropoffLat,
+      dropoffLng: dropoffLng,
+      vehicleType: vehicleType,
+      estimatedFare: fare,
+      distanceKm: distanceKm,
+      durationMin: durationMin,
+      paymentMethod: paymentMethod,
+    );
+  }
+
   static Future<Map<String, dynamic>> getRides({int limit = 20, int offset = 0}) async {
     final baseUrl = await getBaseUrl();
     final response = await http.get(

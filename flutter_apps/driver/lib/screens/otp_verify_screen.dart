@@ -123,7 +123,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                     border: Border.all(color: const Color(0xFF10B981)),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisSize.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('🔑 আপনার কোড: ', style: TextStyle(color: Colors.white70)),
                       Text(
