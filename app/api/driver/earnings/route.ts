@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No pending earnings to payout' }, { status: 400 });
     }
 
-    const totalPayout = pending.reduce((sum, e) => sum + parseFloat(e.net_amount), 0);
+    const totalPayout = pending.reduce((sum: number, e: any) => sum + parseFloat(e.net_amount), 0);
     const ids = pending.map(e => e.id);
 
     // Mark as paid (in production, integrate with payment gateway)
