@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       count: drivers.length,
-      drivers: drivers.map(d => {
+      drivers: drivers.map((d: any) => {
         const aadhaarClean = (d.aadhaar_number || '').replace(/\s/g, '');
         const panClean = (d.pan_number || '').trim().toUpperCase();
         const dlClean = (d.dl_number || '').trim().toUpperCase();
