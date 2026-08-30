@@ -39,6 +39,8 @@ jobs:
         run: pnpm run build:all
         env:
           STATIC_EXPORT: 'true'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Build Admin APK (Capacitor)
         run: |

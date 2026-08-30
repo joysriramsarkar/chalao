@@ -30,8 +30,8 @@ export const AdminAuthScreen: React.FC = () => {
     setIsMuted 
   } = useApp();
 
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('echo123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -171,7 +171,7 @@ export const AdminAuthScreen: React.FC = () => {
                   <User className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{t.usernameLabel || 'অ্যাডমিন ইউজারনেম'}</span>
                 </span>
-                <span className="text-[10px] text-slate-500">ID: admin</span>
+                <span className="text-[10px] text-slate-500">অ্যাডমিন আইডি</span>
               </label>
 
               <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950/80 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/30 transition-all">
@@ -194,7 +194,7 @@ export const AdminAuthScreen: React.FC = () => {
                   <Lock className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{t.passwordLabel || 'সিকিউরিটি পাসওয়ার্ড'}</span>
                 </span>
-                <span className="text-[10px] text-slate-500">Key: echo123</span>
+                <span className="text-[10px] text-slate-500">সিকিউর পাসওয়ার্ড</span>
               </label>
 
               <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950/80 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/30 transition-all">

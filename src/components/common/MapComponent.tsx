@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LocationPoint, Driver } from '../../types';
 
-const CARTO_API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhIjoiYWNfbjk4enk5eXoiLCJqdGkiOiI4YmQ1ZjQ5YyJ9.ATAaA7HU9cW4xE8PPZFS8BvB4OeUUB6PhB62vK9h9h8';
+
+
 
 interface MapComponentProps {
   pickup?: LocationPoint | null;
@@ -58,14 +59,15 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           attributionControl: false
         });
 
-        // CartoDB High-Res Licensed Tiles with API Key (Watermark-Free)
+
+        // OpenStreetMap tiles — free, no API key needed, no watermark
         const tileUrl = mapStyle === 'dark'
-          ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?api_key=${CARTO_API_KEY}`
-          : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?api_key=${CARTO_API_KEY}`;
+          ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`
+          : `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`;
 
         L.tileLayer(tileUrl, {
           maxZoom: 19,
-          subdomains: 'abcd',
+          subdomains: mapStyle === 'dark' ? 'abcd' : 'abc',
         }).addTo(map);
 
         L.control.zoom({ position: 'topright' }).addTo(map);

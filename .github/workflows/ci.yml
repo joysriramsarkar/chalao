@@ -30,3 +30,7 @@ jobs:
 
       - name: Build Next.js Application
         run: pnpm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          STATIC_EXPORT: 'false'
