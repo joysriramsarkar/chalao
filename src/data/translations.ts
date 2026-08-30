@@ -75,6 +75,13 @@ export const TRANSLATIONS = {
     pricingConfigTitle: 'স্বচ্ছ প্রাইসিং ও কমিশন কনফিগারেশন',
     incidentControl: 'জরুরি নিরাপত্তা ও ইনসিডেন্ট কন্ট্রোল',
     resolveIncident: 'সমাধান করুন',
+    adminLoginTitle: 'চালাও সমবায় সেন্ট্রাল অ্যাডমিন লগইন',
+    adminLoginSubtitle: 'অথরাইজড কো-অপারেটিভ ফ্লিট ও ডিসপ্যাচ কন্ট্রোল প্যানেল',
+    usernameLabel: 'অ্যাডমিন ইউজারনেম',
+    passwordLabel: 'সিকিউরিটি পাসওয়ার্ড',
+    adminLoginBtn: 'লগইন করুন ও ড্যাশবোর্ড চালু করুন',
+    adminLogoutBtn: 'লগআউট',
+    adminSecurityNotice: 'সুরক্ষিত ২৫৬-বিট এনক্রিপ্টেড সেশন • MSCS Act 2002',
     
     // Safety
     safetyHub: 'চালাও সুরক্ষা কেন্দ্র (Safety Hub)',
@@ -161,6 +168,13 @@ export const TRANSLATIONS = {
     pricingConfigTitle: 'पारदर्शी मूल्य निर्धारण एवं कमीशन',
     incidentControl: 'आपातकालीन सुरक्षा एवं नियंत्रण',
     resolveIncident: 'समाधान करें',
+    adminLoginTitle: 'चलाओ केंद्रीय एडमिन लॉगिन',
+    adminLoginSubtitle: 'अधिकृत सहकारी फ्लीट व नियंत्रण कक्ष',
+    usernameLabel: 'एडमिन यूजरनेम',
+    passwordLabel: 'सुरक्षा पासवर्ड',
+    adminLoginBtn: 'लॉगिन करें एवं डैशबोर्ड खोलें',
+    adminLogoutBtn: 'लॉगआउट',
+    adminSecurityNotice: 'सुरक्षित २५६-बिट एन्क्रिप्टेड सत्र • MSCS Act 2002',
     
     // Safety
     safetyHub: 'चलाओ सुरक्षा केंद्र (Safety Hub)',
@@ -247,6 +261,13 @@ export const TRANSLATIONS = {
     pricingConfigTitle: 'Transparent Pricing & Commission Engine',
     incidentControl: 'Emergency SOS & Incident Command',
     resolveIncident: 'Resolve Incident',
+    adminLoginTitle: 'Chalao Central Admin Login',
+    adminLoginSubtitle: 'Authorized Co-op Fleet & Dispatch Operations Suite',
+    usernameLabel: 'Admin Username',
+    passwordLabel: 'Security Password',
+    adminLoginBtn: 'Sign In to Dashboard',
+    adminLogoutBtn: 'Log Out',
+    adminSecurityNotice: '256-Bit Encrypted Session • MSCS Act 2002',
     
     // Safety
     safetyHub: 'Chalao Safety Hub',

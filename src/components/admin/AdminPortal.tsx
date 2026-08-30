@@ -25,7 +25,9 @@ import {
   FileText,
   AlertCircle,
   ShieldCheck,
-  ExternalLink
+  ExternalLink,
+  LogOut,
+  Lock
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
 
@@ -50,7 +52,8 @@ export const AdminPortal: React.FC = () => {
     getCurrencySymbol,
     currentCity,
     refreshDrivers,
-    isRefreshing
+    isRefreshing,
+    logoutAdmin
   } = useApp();
 
   const t = TRANSLATIONS[language];
@@ -85,6 +88,37 @@ export const AdminPortal: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-6">
       
+      {/* Admin Session Security Bar */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+            <Lock className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white">
+                {isBn ? 'সুপার অ্যাডমিন সেশন (Super Admin)' : isHi ? 'सुपर एडमिन सत्र' : 'Super Admin Session'}
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                admin
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {isBn ? 'সুরক্ষিত ২৫৬-বিট এনক্রিপ্টেড সংযোগ • পূর্ণ ডিসপ্যাচ ও ফ্লিট নিয়ন্ত্রণ সক্রিয়' : '256-Bit SSL Secured • Full Dispatch & KYC Override Active'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={logoutAdmin}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold transition-all shadow-sm active:scale-95"
+          title="অ্যাডমিন লগআউট"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>{isBn ? 'অ্যাডমিন লগআউট' : isHi ? 'एडमिन लॉगआउट' : 'Admin Logout'}</span>
+        </button>
+      </div>
+
       {/* Top Admin Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         

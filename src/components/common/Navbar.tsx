@@ -10,7 +10,8 @@ import {
   VolumeX, 
   MapPin,
   RefreshCw,
-  Database
+  Database,
+  LogOut
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
 
@@ -18,9 +19,11 @@ interface NavbarProps {
   onOpenSafety?: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  onLogout?: () => void;
+  isAdmin?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefreshing }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefreshing, onLogout, isAdmin }) => {
   const { 
     language, 
     setLanguage, 
@@ -140,6 +143,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefre
             >
               {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
             </button>
+
+            {/* Admin Logout Button */}
+            {onLogout && (
+              <button
+                onClick={() => {
+                  sound.playClickSound();
+                  onLogout();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-bold transition-all shadow-sm"
+                title={isBn ? 'লগআউট করুন' : isHi ? 'लॉगआउट करें' : 'Log Out'}
+              >
+                <LogOut className="w-3.5 h-3.5 text-red-400" />
+                <span className="hidden sm:inline">{isBn ? 'লগআউট' : isHi ? 'लॉगआउट' : 'Logout'}</span>
+              </button>
+            )}
           </div>
 
         </div>

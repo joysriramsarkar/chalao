@@ -4,13 +4,18 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Navbar } from './common/Navbar';
 import { AdminPortal } from './admin/AdminPortal';
+import { AdminAuthScreen } from './admin/AdminAuthScreen';
 import { SafetyModal } from './safety/SafetyModal';
 import { ShieldCheck, Sparkles } from 'lucide-react';
 
 export const ChalaoPlatform: React.FC = () => {
-  const { language, refreshDrivers, isRefreshing } = useApp();
+  const { language, refreshDrivers, isRefreshing, isAdminAuthenticated, logoutAdmin } = useApp();
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
   const isBn = language === 'bn';
+
+  if (!isAdminAuthenticated) {
+    return <AdminAuthScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
@@ -20,6 +25,8 @@ export const ChalaoPlatform: React.FC = () => {
         onOpenSafety={() => setIsSafetyOpen(true)} 
         onRefresh={() => refreshDrivers()} 
         isRefreshing={isRefreshing}
+        onLogout={logoutAdmin}
+        isAdmin={true}
       />
 
       {/* Main Admin Management Suite */}

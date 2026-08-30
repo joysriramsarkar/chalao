@@ -54,6 +54,11 @@ interface AppContextType {
   registerDriver: (data: Partial<Driver>) => void;
   logout: () => void;
 
+  // Admin Auth state
+  isAdminAuthenticated: boolean;
+  loginAsAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logoutAdmin: () => void;
+
   // Rider & Driver State
   rider: Rider;
   drivers: Driver[];
@@ -117,6 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>('admin' as any);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
   const [rider, setRider] = useState<Rider>(INITIAL_RIDER);
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
@@ -260,6 +266,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sound.playClickSound();
     setIsAuthenticated(false);
     setAuthRole(null);
+  };
+
+  useEffect(() => {
+    // Check localStorage for persisted admin session
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('chalao_admin_token');
+      const storedAuth = localStorage.getItem('chalao_admin_auth');
+      if (storedToken || storedAuth === 'true') {
+        setIsAdminAuthenticated(true);
+      }
+    }
+  }, []);
+
+  const loginAsAdmin = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const trimmedUser = (username || '').trim().toLowerCase();
+    const trimmedPass = (password || '').trim();
+
+    // Client fallback validation for standalone Capacitor/offline mode
+    const isClientValid = trimmedUser === 'admin' && trimmedPass === 'echo123';
+
+    try {
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: trimmedUser, password: trimmedPass })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('chalao_admin_token', data.token || 'admin_jwt_session');
+            localStorage.setItem('chalao_admin_auth', 'true');
+          }
+          setIsAdminAuthenticated(true);
+          sound.playTripStartedChime();
+          return { success: true };
+        } else {
+          return { success: false, error: data.error || 'ইউজারনেম অথবা পাসওয়ার্ড ভুল!' };
+        }
+      }
+    } catch (e) {
+      console.warn('Backend admin login request failed, checking client fallback:', e);
+    }
+
+    if (isClientValid) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('chalao_admin_token', 'admin_client_session');
+        localStorage.setItem('chalao_admin_auth', 'true');
+      }
+      setIsAdminAuthenticated(true);
+      sound.playTripStartedChime();
+      return { success: true };
+    }
+
+    return { success: false, error: 'ভুল ইউজারনেম অথবা পাসওয়ার্ড!' };
+  };
+
+  const logoutAdmin = () => {
+    sound.playClickSound();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('chalao_admin_token');
+      localStorage.removeItem('chalao_admin_auth');
+    }
+    setIsAdminAuthenticated(false);
   };
 
   const setLanguage = (lang: Language) => {
@@ -639,6 +710,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginAsDriver,
         registerDriver,
         logout,
+        isAdminAuthenticated,
+        loginAsAdmin,
+        logoutAdmin,
         rider,
         drivers,
         currentDriver,
