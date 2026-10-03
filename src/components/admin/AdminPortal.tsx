@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { MapComponent } from '../common/MapComponent';
@@ -62,7 +62,13 @@ export const AdminPortal: React.FC = () => {
   const currencySymbol = getCurrencySymbol();
 
   const [activeTab, setActiveTab] = useState<'kyc' | 'fleet' | 'pricing' | 'incidents'>('kyc');
-  const [editingPricing, setEditingPricing] = useState<PricingRule[]>(pricingRules);
+  const [editingPricing, setEditingPricing] = useState<PricingRule[]>(pricingRules.map(r => ({ ...r })));
+
+  // Re-sync the pricing editor whenever the live pricing rules change (deep copies,
+  // so typing in the editor never mutates the shared context state)
+  useEffect(() => {
+    setEditingPricing(pricingRules.map(r => ({ ...r })));
+  }, [pricingRules]);
   const [saveToast, setSaveToast] = useState(false);
   const [actionSuccessToast, setActionSuccessToast] = useState<string | null>(null);
   const [docModal, setDocModal] = useState<DocPreviewState | null>(null);
@@ -73,14 +79,35 @@ export const AdminPortal: React.FC = () => {
   const openIncidents = incidents.filter(i => i.status !== 'resolved');
 
   const handleSavePricing = () => {
-    editingPricing.forEach(rule => updatePricingRule(rule));
+    editingPricing.forEach(rule => {
+      // Clamp commission to the advertised 5-10% co-op range before saving
+      const clamped: PricingRule = {
+        ...rule,
+        baseFare: Math.max(0, Number(rule.baseFare) || 0),
+        perKm: Math.max(0, Number(rule.perKm) || 0),
+        perMin: Math.max(0, Number(rule.perMin) || 0),
+        platformCommissionPercent: Math.min(10, Math.max(5, Number(rule.platformCommissionPercent) || 5)),
+      };
+      updatePricingRule(clamped);
+    });
     setSaveToast(true);
     sound.playTripStartedChime();
     setTimeout(() => setSaveToast(false), 2000);
   };
 
   const handleVerify = async (driverId: string, status: 'verified' | 'rejected') => {
-    await verifyDriverKyc(driverId, status);
+    const ok = await verifyDriverKyc(driverId, status);
+    if (!ok) {
+      setActionSuccessToast(
+        isBn
+          ? 'KYC আপডেট ব্যর্থ হয়েছে — আবার চেষ্টা করুন।'
+          : isHi
+          ? 'KYC अपडेट विफल — पुनः प्रयास करें।'
+          : 'KYC update failed — please try again.'
+      );
+      setTimeout(() => setActionSuccessToast(null), 3000);
+      return;
+    }
     setActionSuccessToast(status === 'verified' ? 'চালক সফলভাবে অনুমোদিত হয়েছে!' : 'চালকের আবেদন প্রত্যাখ্যাত হয়েছে।');
     setTimeout(() => setActionSuccessToast(null), 3000);
   };
@@ -155,7 +182,7 @@ export const AdminPortal: React.FC = () => {
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium">{isBn ? 'মোট নিবন্ধিত চালক' : 'Total Drivers'}</div>
-            <div className="text-xl font-black text-white">{drivers.length} <span className="text-xs text-slate-500 font-normal">({verifiedDrivers.length} অনুমোদিত)</span></div>
+            <div className="text-xl font-black text-white">{drivers.length} <span className="text-xs text-slate-500 font-normal">({verifiedDrivers.length} {isBn ? 'অনুমোদিত' : isHi ? 'अनुमोदित' : 'verified'})</span></div>
           </div>
         </div>
 
@@ -252,7 +279,7 @@ export const AdminPortal: React.FC = () => {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition-all"
         >
           <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">{isRefreshing ? 'ডাটা সিঙ্ক হচ্ছে...' : 'রিফ্রেশ'}</span>
+          <span className="hidden sm:inline">{isRefreshing ? (isBn ? 'ডাটা সিঙ্ক হচ্ছে...' : isHi ? 'डेटा सिंक हो रहा है...' : 'Syncing...') : (isBn ? 'রিফ্রেশ' : isHi ? 'रिफ्रेश' : 'Refresh')}</span>
         </button>
       </div>
 
@@ -407,7 +434,7 @@ export const AdminPortal: React.FC = () => {
                             onClick={() => setDocModal({
                               title: 'ড্রাইভিং লাইসেন্স (Driving License)',
                               docNumber: driver.licenseNumber || 'DL-Pending',
-                              photoUrl: driver.dlPhotoUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+                              photoUrl: driver.dlPhotoUrl || null,
                               isValid: dlValid,
                               docType: 'dl',
                               driverName: driver.name,
@@ -437,7 +464,7 @@ export const AdminPortal: React.FC = () => {
                             onClick={() => setDocModal({
                               title: 'গাড়ির রেজিস্ট্রেশন সার্টিফিকেট (RC)',
                               docNumber: driver.rcNumber || driver.plateNumber || 'RC-Pending',
-                              photoUrl: driver.rcPhotoUrl || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800',
+                              photoUrl: driver.rcPhotoUrl || null,
                               isValid: rcValid,
                               docType: 'rc',
                               driverName: driver.name,
@@ -467,7 +494,7 @@ export const AdminPortal: React.FC = () => {
                             onClick={() => setDocModal({
                               title: 'আধার কার্ড (Aadhaar Card)',
                               docNumber: driver.aadhaarNumber || 'XXXX-XXXX-XXXX',
-                              photoUrl: driver.aadhaarPhotoUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+                              photoUrl: driver.aadhaarPhotoUrl || null,
                               isValid: aadhaarValid,
                               docType: 'aadhaar',
                               driverName: driver.name,
@@ -497,7 +524,7 @@ export const AdminPortal: React.FC = () => {
                             onClick={() => setDocModal({
                               title: 'প্যান কার্ড (PAN Card)',
                               docNumber: driver.panNumber || 'XXXXX0000X',
-                              photoUrl: driver.panPhotoUrl || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
+                              photoUrl: driver.panPhotoUrl || null,
                               isValid: panValid,
                               docType: 'pan',
                               driverName: driver.name,
@@ -653,9 +680,15 @@ export const AdminPortal: React.FC = () => {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       driver.verificationStatus === 'verified' 
                         ? 'bg-emerald-500/20 text-emerald-300' 
+                        : driver.verificationStatus === 'rejected'
+                        ? 'bg-rose-500/20 text-rose-300'
                         : 'bg-amber-500/20 text-amber-300'
                     }`}>
-                      {driver.verificationStatus === 'verified' ? 'Verified' : 'Pending'}
+                      {driver.verificationStatus === 'verified'
+                        ? (isBn ? 'ভেরিফাইড' : isHi ? 'सत्यापित' : 'Verified')
+                        : driver.verificationStatus === 'rejected'
+                        ? (isBn ? 'বাতিল' : isHi ? 'अस्वीकृत' : 'Rejected')
+                        : (isBn ? 'অপেক্ষমান' : isHi ? 'लंबित' : 'Pending')}
                     </span>
                   </div>
                 </div>
@@ -709,7 +742,7 @@ export const AdminPortal: React.FC = () => {
                       value={rule.baseFare}
                       onChange={(e) => {
                         const updated = [...editingPricing];
-                        updated[idx].baseFare = Number(e.target.value);
+                        updated[idx] = { ...updated[idx], baseFare: Number(e.target.value) };
                         setEditingPricing(updated);
                       }}
                       className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-right text-white font-bold"
@@ -723,7 +756,7 @@ export const AdminPortal: React.FC = () => {
                       value={rule.perKm}
                       onChange={(e) => {
                         const updated = [...editingPricing];
-                        updated[idx].perKm = Number(e.target.value);
+                        updated[idx] = { ...updated[idx], perKm: Number(e.target.value) };
                         setEditingPricing(updated);
                       }}
                       className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-right text-white font-bold"
@@ -739,7 +772,7 @@ export const AdminPortal: React.FC = () => {
                       value={rule.platformCommissionPercent}
                       onChange={(e) => {
                         const updated = [...editingPricing];
-                        updated[idx].platformCommissionPercent = Number(e.target.value);
+                        updated[idx] = { ...updated[idx], platformCommissionPercent: Number(e.target.value) };
                         setEditingPricing(updated);
                       }}
                       className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-right text-emerald-400 font-bold"

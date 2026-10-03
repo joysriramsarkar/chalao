@@ -70,6 +70,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!rideResult.length) return NextResponse.json({ error: 'Ride not found' }, { status: 404 });
     const ride = rideResult[0];
 
+    // Authorization: riders may only modify their own rides; drivers only rides
+    // assigned to them (or unassigned searching rides they are accepting); admins any ride.
+    if (payload.role === 'rider' && ride.rider_id !== payload.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (
+      payload.role === 'driver' &&
+      ride.driver_id !== null &&
+      ride.driver_id !== payload.userId
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // OTP pin verification (driver verifying rider OTP before trip starts)
     if (status === 'ongoing' && payload.role === 'driver') {
       if (!otpPin || otpPin !== ride.rider_otp_pin) {
@@ -85,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         WHERE id = ${rideId} AND status = 'searching'
       `;
     } else if (status === 'completed') {
-      const fare = finalFare || ride.estimated_fare;
+      const fare = Number(finalFare ?? ride.estimated_fare ?? 0);
       await sql`
         UPDATE rides
         SET status = 'completed',
@@ -100,8 +113,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         WHERE id = ${rideId}
       `;
 
-      // Create earnings record
-      if (ride.driver_id) {
+      // Create earnings record — only on first completion, so repeat PATCHes
+      // (e.g. late rating submissions) don't duplicate earnings or inflate stats
+      if (ride.driver_id && ride.status !== 'completed') {
         const commissionPct = 9.0;
         const commissionAmt = (fare * commissionPct) / 100;
         const netAmount = fare - commissionAmt;
@@ -122,6 +136,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         `;
       }
     } else {
+      const allowedStatuses = ['accepted', 'arrived', 'ongoing', 'cancelled'];
+      if (!status || !allowedStatuses.includes(status)) {
+        return NextResponse.json({ error: 'Invalid or missing status' }, { status: 400 });
+      }
       await sql`
         UPDATE rides
         SET status = ${status},

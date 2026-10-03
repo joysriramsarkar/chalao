@@ -32,9 +32,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Never cache API calls — admin dashboards and live ride polling need fresh data
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+
   // Navigation & Cache First with Network Fallback
-  if (event.request.method === 'GET') {
-    event.respondWith(
+  event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
           // Fetch update in background
@@ -51,6 +55,5 @@ self.addEventListener('fetch', (event) => {
           }
         });
       })
-    );
-  }
+  );
 });

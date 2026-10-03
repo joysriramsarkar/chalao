@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -49,17 +49,26 @@ export const AuthScreen: React.FC = () => {
   const [aadhaarNumber, setAadhaarNumber] = useState('9821-4451-8912');
   const [panNumber, setPanNumber] = useState('ABCDE1234F');
   const [upiId, setUpiId] = useState('subhashish@oksbi');
+  const [otpError, setOtpError] = useState(false);
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) return;
     sound.playClickSound();
     setOtpSent(true);
+    setOtpError(false);
     setStep('otp');
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate the 4-digit OTP format before entering the app
+    if (!/^\d{4}$/.test(otp.trim())) {
+      setOtpError(true);
+      sound.playSOSSiren();
+      return;
+    }
+    setOtpError(false);
     sound.playTripStartedChime();
 
     if (selectedRole === 'rider') {
@@ -199,19 +208,25 @@ export const AuthScreen: React.FC = () => {
                 {isBn ? 'ওটিপি যাচাইকরণ (OTP Verification)' : 'Enter 4-Digit Code'}
               </h3>
               <p className="text-xs text-slate-400">
-                +91 {phone} নম্বরে ৪-সংখ্যার কোড পাঠানো হয়েছে
+                {isBn ? `+91 ${phone} নম্বরে ৪-সংখ্যার কোড পাঠানো হয়েছে` : isHi ? `+91 ${phone} नंबर पर ४-अंकों का कोड भेजा गया है` : `A 4-digit code was sent to +91 ${phone}`}
               </p>
             </div>
 
             <div className="py-2">
               <input
                 type="text"
+                inputMode="numeric"
                 maxLength={4}
                 required
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => setOtp(e.target.value.replace(/[^\d]/g, ''))}
                 className="w-40 mx-auto text-center tracking-widest text-2xl font-black bg-slate-950 border-2 border-emerald-500 rounded-2xl py-2.5 text-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-500/30"
               />
+              {otpError && (
+                <div className="mt-2 text-[11px] text-red-400 font-semibold">
+                  {isBn ? 'সঠিক ৪-সংখ্যার সংখ্যাগত কোড লিখুন।' : isHi ? 'कृपया सही ४-अंकों का संख्यात्मक कोड दर्ज करें।' : 'Please enter a valid 4-digit numeric code.'}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -294,6 +309,19 @@ export const AuthScreen: React.FC = () => {
               </div>
             </div>
 
+            <div>
+              <label className="text-slate-300 font-semibold block mb-1">
+                {isBn ? 'গাড়ির মডেল:' : isHi ? 'वाहन मॉडल:' : 'Vehicle Model:'}
+              </label>
+              <input
+                type="text"
+                required
+                value={vehicleModel}
+                onChange={(e) => setVehicleModel(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-slate-300 font-semibold block mb-1">
@@ -320,6 +348,19 @@ export const AuthScreen: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-semibold block mb-1">
+                {isBn ? 'প্যান নম্বর (PAN):' : isHi ? 'पैन नंबर (PAN):' : 'PAN Card No:'}
+              </label>
+              <input
+                type="text"
+                required
+                value={panNumber}
+                onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+              />
             </div>
 
             <div>

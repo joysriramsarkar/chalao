@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { projectDriverPatronage, COOP_FINANCIAL_SUMMARY_2026 } from '../../services/coopEngine';
@@ -31,6 +31,11 @@ export const MemberPortal: React.FC = () => {
   const [calcDailyTrips, setCalcDailyTrips] = useState(10);
   const [calcAvgFare, setCalcAvgFare] = useState(150);
   const [calcShares, setCalcShares] = useState(rider.sharesOwned || 10);
+
+  // Keep the calculator in sync when the member buys new shares
+  useEffect(() => {
+    setCalcShares(rider.sharesOwned || 10);
+  }, [rider.sharesOwned]);
 
   // Buy shares modal state
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -241,8 +246,12 @@ export const MemberPortal: React.FC = () => {
           <div className="space-y-4">
             {motions.map(motion => {
               const totalVotes = motion.yesVotes + motion.noVotes + motion.abstainVotes;
-              const yesPercent = totalVotes > 0 ? Math.round((motion.yesVotes / totalVotes) * 100) : 0;
-              const noPercent = totalVotes > 0 ? Math.round((motion.noVotes / totalVotes) * 100) : 0;
+              const toPercent = (votes: number) => totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+              const yesPercent = Math.round(toPercent(motion.yesVotes));
+              const noPercent = Math.round(toPercent(motion.noVotes));
+              // Abstain takes the remainder so the bar always totals exactly 100%
+              const abstainPercent = totalVotes > 0 ? Math.max(0, 100 - yesPercent - noPercent) : 0;
+              const isVotingOpen = motion.status === 'active';
 
               return (
                 <div 
@@ -259,9 +268,24 @@ export const MemberPortal: React.FC = () => {
                       </h4>
                     </div>
 
-                    <span className="text-xs text-slate-400 whitespace-nowrap">
-                      {isBn ? `সময়সীমা: ${motion.deadline}` : `Deadline: ${motion.deadline}`}
-                    </span>
+                    <div className="flex flex-col items-start sm:items-end gap-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border uppercase ${
+                        motion.status === 'active'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : motion.status === 'passed'
+                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                          : 'bg-slate-700/40 text-slate-300 border-slate-600/40'
+                      }`}>
+                        {motion.status === 'active'
+                          ? (isBn ? 'ভোট চলছে' : isHi ? 'मतदान चल रहा है' : 'Voting Open')
+                          : motion.status === 'passed'
+                          ? (isBn ? 'অনুমোদিত' : isHi ? 'पारित' : 'Passed')
+                          : (isBn ? 'বাতিল' : isHi ? 'अस्वीकृत' : 'Rejected')}
+                      </span>
+                      <span className="text-xs text-slate-400 whitespace-nowrap">
+                        {isBn ? `সময়সীমা: ${motion.deadline}` : `Deadline: ${motion.deadline}`}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed">
@@ -277,6 +301,9 @@ export const MemberPortal: React.FC = () => {
                     <div className="w-full bg-slate-950 rounded-full h-3 flex overflow-hidden border border-slate-800">
                       <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${yesPercent}%` }} />
                       <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${noPercent}%` }} />
+                      {abstainPercent > 0 && (
+                        <div className="bg-slate-600 h-full transition-all duration-500" style={{ width: `${abstainPercent}%` }} title={`${t.abstain}: ${motion.abstainVotes}`} />
+                      )}
                     </div>
                   </div>
 
@@ -287,7 +314,7 @@ export const MemberPortal: React.FC = () => {
                         <CheckCircle2 className="w-4 h-4" />
                         <span>{isBn ? `আপনার ভোট দেওয়া হয়েছে: [${motion.myVote.toUpperCase()}]` : isHi ? `आपका वोट दर्ज हुआ: [${motion.myVote.toUpperCase()}]` : `Your ballot cast: [${motion.myVote.toUpperCase()}]`}</span>
                       </div>
-                    ) : (
+                    ) : isVotingOpen ? (
                       <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
                           onClick={() => castVote(motion.id, 'yes')}
@@ -307,6 +334,10 @@ export const MemberPortal: React.FC = () => {
                         >
                           {t.abstain}
                         </button>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-semibold text-slate-500">
+                        {isBn ? 'এই প্রস্তাবের ভোটগ্রহণ শেষ হয়েছে' : isHi ? 'इस प्रस्ताव का मतदान समाप्त हो गया है' : 'Voting has closed for this motion'}
                       </div>
                     )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { 
@@ -31,6 +31,23 @@ export const SafetyModal: React.FC<SafetyModalProps> = ({ isOpen, onClose }) => 
   const [fakeCalling, setFakeCalling] = useState(false);
   const [fakeCallAnswered, setFakeCallAnswered] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset transient state every time the modal is opened, and clean up timers on close/unmount
+  useEffect(() => {
+    if (isOpen) {
+      setSosTriggered(false);
+      setFakeCalling(false);
+      setFakeCallAnswered(false);
+      setCopiedLink(false);
+    }
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -45,12 +62,38 @@ export const SafetyModal: React.FC<SafetyModalProps> = ({ isOpen, onClose }) => 
     );
   };
 
-  const handleCopyShareLink = () => {
+  const handleCopyShareLink = async () => {
     const rideId = activeRide?.id || 'CH-IN-TRACK';
-    const dummyUrl = `https://chalao.coop/track/${rideId}`;
-    navigator.clipboard.writeText(dummyUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    const trackUrl = `https://chalao.coop/track/${rideId}`;
+    let copied = false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(trackUrl);
+        copied = true;
+      } else {
+        // Fallback for non-secure contexts (HTTP / older WebViews) where navigator.clipboard is undefined
+        const textarea = document.createElement('textarea');
+        textarea.value = trackUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch {
+      copied = false;
+    }
+
+    if (copied) {
+      setCopiedLink(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedLink(false);
+        copyTimerRef.current = null;
+      }, 2000);
+    }
   };
 
   const startFakeCall = () => {

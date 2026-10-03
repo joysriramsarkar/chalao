@@ -67,15 +67,16 @@ export const DriverApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety
       return;
     }
 
+    let secondsLeft = 15;
+    setOfferCountdown(secondsLeft);
+
     const interval = setInterval(() => {
-      setOfferCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          declineRide();
-          return 15;
-        }
-        return prev - 1;
-      });
+      secondsLeft -= 1;
+      setOfferCountdown(secondsLeft);
+      if (secondsLeft <= 0) {
+        clearInterval(interval);
+        declineRide();
+      }
     }, 1000);
 
     return () => clearInterval(interval);

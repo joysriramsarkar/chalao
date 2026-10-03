@@ -66,8 +66,8 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
   const [mobileTab, setMobileTab] = useState<'ride' | 'trips' | 'coop' | 'profile'>('ride');
 
   // Booking State
-  const [pickup, setPickup] = useState<LocationPoint>(availableLocations[0] || availableLocations[0]);
-  const [dropoff, setDropoff] = useState<LocationPoint>(availableLocations[1] || availableLocations[0]);
+  const [pickup, setPickup] = useState<LocationPoint | undefined>(availableLocations[0]);
+  const [dropoff, setDropoff] = useState<LocationPoint | undefined>(availableLocations[1] || availableLocations[0]);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('bike');
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'cash' | 'wallet' | 'card'>('upi');
   const [showFareModal, setShowFareModal] = useState(false);
@@ -413,8 +413,14 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
                         </button>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(`https://chalao.coop/track/${activeRide.id}`);
-                            alert(isBn ? 'লাইভ ট্র্যাকিং লিংক কপি হয়েছে!' : 'Tracking link copied!');
+                            const trackUrl = `https://chalao.coop/track/${activeRide.id}`;
+                            if (navigator.clipboard?.writeText) {
+                              navigator.clipboard.writeText(trackUrl)
+                                .then(() => alert(isBn ? 'লাইভ ট্র্যাকিং লিংক কপি হয়েছে!' : 'Tracking link copied!'))
+                                .catch(() => alert(trackUrl));
+                            } else {
+                              alert(trackUrl);
+                            }
                           }}
                           className="p-2.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 font-bold flex items-center justify-center gap-1.5"
                         >

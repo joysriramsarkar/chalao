@@ -100,7 +100,7 @@ export function projectDriverPatronage(
   
   // 30% of platform fees return as patronage pool + activity weight
   const annualFeePaid = monthlyPlatformFeePaid * 12;
-  const projectedAnnualPatronageBonus = Math.round(annualFeePaid * 0.35);
+  const projectedAnnualPatronageBonus = Math.round(annualFeePaid * 0.30);
   
   // ₹500 per share with 8% projected co-op dividend
   const shareCapital = sharesOwned * 500;

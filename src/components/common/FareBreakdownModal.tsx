@@ -3,7 +3,7 @@
 import React from 'react';
 import { FareBreakdown } from '../../services/coopEngine';
 import { VehicleOption, Language } from '../../types';
-import { X, ShieldCheck, Heart, Cpu, Landmark, Users, ArrowRight } from 'lucide-react';
+import { X, ShieldCheck, Heart, Cpu, Landmark, Users, ArrowRight, HeartHandshake, Award } from 'lucide-react';
 
 interface FareBreakdownModalProps {
   isOpen: boolean;
@@ -190,6 +190,22 @@ export const FareBreakdownModal: React.FC<FareBreakdownModalProps> = ({
               <div>
                 <div className="font-semibold text-slate-200">{isBn ? 'টেক ও সার্ভার রক্ষণাবেক্ষণ' : isHi ? 'तकनीकी एवं सर्वर' : 'Tech & Server'} (15%)</div>
                 <div className="text-emerald-400 font-bold">{currencySymbol}{fare.feeAllocation.techAndPlatform}</div>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-start gap-2">
+              <HeartHandshake className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold text-slate-200">{isBn ? 'দুর্ঘটনা বীমা পুল' : isHi ? 'दुर्घटना बीमा पूल' : 'Accident Insurance Pool'} (10%)</div>
+                <div className="text-emerald-400 font-bold">{currencySymbol}{fare.feeAllocation.accidentInsurancePool}</div>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-start gap-2">
+              <Award className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold text-slate-200">{isBn ? 'শেয়ারহোল্ডার লভ্যাংশ' : isHi ? 'शेयरधारक लाभांश' : 'Shareholder Dividend'} (5%)</div>
+                <div className="text-emerald-400 font-bold">{currencySymbol}{fare.feeAllocation.shareholderDividend}</div>
               </div>
             </div>
           </div>

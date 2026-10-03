@@ -86,7 +86,7 @@ interface AppContextType {
   
   // Driver Actions
   toggleDriverOnline: () => void;
-  verifyDriverKyc: (driverId: string, status: 'verified' | 'rejected') => void;
+  verifyDriverKyc: (driverId: string, status: 'verified' | 'rejected') => Promise<boolean>;
   requestDriverPayout: (amount: number) => boolean;
   
   // Member & Governance Actions
@@ -144,6 +144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.drivers) && data.drivers.length > 0) {
+          const validVehicleTypes: VehicleType[] = ['bike', 'auto', 'car', 'pink', 'share', 'green'];
           const mappedDrivers: Driver[] = data.drivers.map((d: any) => ({
             id: d.id,
             name: d.name,
@@ -152,7 +153,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             photo: d.photoUrl,
             rating: d.rating,
             totalTrips: d.totalTrips,
-            vehicleType: (d.vehicleType as VehicleType) || 'bike',
+            // DB values like 'sedan'/'suv' are not part of the VehicleType union —
+            // map them to the closest supported type so pricing rules apply correctly.
+            vehicleType: validVehicleTypes.includes(d.vehicleType)
+              ? (d.vehicleType as VehicleType)
+              : (d.vehicleType === 'sedan' ? 'car' : 'bike'),
             vehicleModel: d.vehicleModel,
             plateNumber: d.vehicleNumber,
             isOnline: d.isOnline,
@@ -504,56 +509,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeRide?.status]);
 
   const completeTrip = () => {
+    if (!activeRide || activeRide.status === 'COMPLETED' || activeRide.status === 'PAID') return;
     sound.playTripCompletedFanfare();
-    
+    const completedRide = activeRide;
+
+    if (completedRide.driver) {
+      const dId = completedRide.driver.id;
+      setDrivers(curr => curr.map(d => {
+        if (d.id === dId) {
+          return {
+            ...d,
+            isBusy: false,
+            todayEarnings: d.todayEarnings + completedRide.driverEarnings,
+            todayTrips: d.todayTrips + 1,
+            walletBalance: d.walletBalance + completedRide.driverEarnings,
+            patronageAccrued: d.patronageAccrued + Math.round(completedRide.platformFee * 0.30)
+          };
+        }
+        return d;
+      }));
+    }
+
+    setRider(r => ({
+      ...r,
+      patronagePoints: r.patronagePoints + Math.round(completedRide.fareAmount * 0.1)
+    }));
+
+    // Add to trip history
+    const historyItem: TripHistoryItem = {
+      id: completedRide.id,
+      date: new Date().toLocaleString(),
+      pickupName: completedRide.pickup.nameBn,
+      dropoffName: completedRide.dropoff.nameBn,
+      vehicleType: completedRide.vehicleType,
+      fare: completedRide.fareAmount,
+      paymentMethod: completedRide.paymentMethod.toUpperCase(),
+      status: 'completed',
+      driverName: completedRide.driver?.name,
+      riderName: completedRide.riderName
+    };
+
+    setTripHistory(hist => [historyItem, ...hist]);
+
     setActiveRide(prev => {
       if (!prev) return null;
-      const updated = {
+      return {
         ...prev,
         status: 'COMPLETED' as const,
         completedAt: Date.now(),
         paymentStatus: 'pending' as const
       };
-
-      if (prev.driver) {
-        const dId = prev.driver.id;
-        setDrivers(curr => curr.map(d => {
-          if (d.id === dId) {
-            return {
-              ...d,
-              isBusy: false,
-              todayEarnings: d.todayEarnings + prev.driverEarnings,
-              todayTrips: d.todayTrips + 1,
-              walletBalance: d.walletBalance + prev.driverEarnings,
-              patronageAccrued: d.patronageAccrued + Math.round(prev.platformFee * 0.35)
-            };
-          }
-          return d;
-        }));
-      }
-
-      setRider(r => ({
-        ...r,
-        patronagePoints: r.patronagePoints + Math.round(prev.fareAmount * 0.1)
-      }));
-
-      // Add to trip history
-      const historyItem: TripHistoryItem = {
-        id: prev.id,
-        date: new Date().toLocaleString(),
-        pickupName: prev.pickup.nameBn,
-        dropoffName: prev.dropoff.nameBn,
-        vehicleType: prev.vehicleType,
-        fare: prev.fareAmount,
-        paymentMethod: prev.paymentMethod.toUpperCase(),
-        status: 'completed',
-        driverName: prev.driver?.name,
-        riderName: prev.riderName
-      };
-
-      setTripHistory(hist => [historyItem, ...hist]);
-
-      return updated;
     });
   };
 
@@ -592,7 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const verifyDriverKyc = async (driverId: string, status: 'verified' | 'rejected') => {
+  const verifyDriverKyc = async (driverId: string, status: 'verified' | 'rejected'): Promise<boolean> => {
     sound.playClickSound();
     // Optimistic UI update
     setDrivers(prev => prev.map(d => {
@@ -610,13 +615,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       if (res.ok) {
         await fetchDriversFromDb();
+        return true;
       }
+      console.error('Driver KYC verification failed in DB:', res.status);
+      return false;
     } catch (e) {
       console.error('Error verifying driver KYC in DB:', e);
+      return false;
     }
   };
 
   const requestDriverPayout = (amount: number): boolean => {
+    if (!Number.isFinite(amount) || amount <= 0) return false;
     if (currentDriver.walletBalance < amount) return false;
     sound.playCashPing();
     setDrivers(prev => prev.map(d => {
@@ -631,13 +641,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const castVote = (motionId: string, choice: 'yes' | 'no' | 'abstain') => {
     sound.playTripStartedChime();
     setMotions(prev => prev.map(m => {
-      if (m.id === motionId) {
+      if (m.id === motionId && m.status === 'active') {
+        // If the member already voted, move their vote instead of adding a second one
+        const previousVote = m.myVote;
         return {
           ...m,
           myVote: choice,
-          yesVotes: choice === 'yes' ? m.yesVotes + 1 : m.yesVotes,
-          noVotes: choice === 'no' ? m.noVotes + 1 : m.noVotes,
-          abstainVotes: choice === 'abstain' ? m.abstainVotes + 1 : m.abstainVotes
+          yesVotes: m.yesVotes
+            + (choice === 'yes' ? 1 : 0)
+            - (previousVote === 'yes' ? 1 : 0),
+          noVotes: m.noVotes
+            + (choice === 'no' ? 1 : 0)
+            - (previousVote === 'no' ? 1 : 0),
+          abstainVotes: m.abstainVotes
+            + (choice === 'abstain' ? 1 : 0)
+            - (previousVote === 'abstain' ? 1 : 0)
         };
       }
       return m;
