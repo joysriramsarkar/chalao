@@ -1,51 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, runMigrations } from '@/lib/db';
+import { runMigrations } from '@/lib/db';
+import { requireRole } from '@/lib/auth';
+import { setDriverKycStatus } from '@/lib/kyc';
+import { serverError, unauthorized } from '@/lib/api';
 
-// POST /api/admin/drivers/verify — Approve or reject driver KYC
+export const dynamic = 'force-dynamic';
+
+// POST /api/admin/drivers/verify — Approve or reject driver KYC (admin only)
 export async function POST(req: NextRequest) {
   try {
+    const payload = await requireRole(req, 'admin');
+    if (!payload) return unauthorized('Admin authentication required');
+
     await runMigrations();
-    const { driverId, id, status, notes } = await req.json();
-    const rawId = String(driverId || id || '');
-    const userId = rawId.startsWith('d-') ? parseInt(rawId.replace('d-', ''), 10) : parseInt(rawId, 10);
 
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: 'Invalid driver ID' }, { status: 400 });
-    }
+    const { driverId, id, status, notes } = await req.json().catch(() => ({}));
+    const result = await setDriverKycStatus(driverId || id, status, notes);
 
-    const kycStatus = status === 'verified' || status === 'approved' ? 'approved' : 'rejected';
-
-    // Update driver_profiles
-    const existing = await sql`SELECT id FROM driver_profiles WHERE user_id = ${userId}`;
-
-    if (existing.length) {
-      await sql`
-        UPDATE driver_profiles
-        SET kyc_status = ${kycStatus},
-            kyc_notes = COALESCE(${notes}, kyc_notes),
-            updated_at = NOW()
-        WHERE user_id = ${userId}
-      `;
-    } else {
-      await sql`
-        INSERT INTO driver_profiles (user_id, kyc_status, kyc_notes)
-        VALUES (${userId}, ${kycStatus}, ${notes})
-      `;
-    }
-
-    // Ensure user is active
-    if (kycStatus === 'approved') {
-      await sql`UPDATE users SET is_active = true, updated_at = NOW() WHERE id = ${userId}`;
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status || 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: `চালক KYC সফলভাবে ${kycStatus === 'approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} করা হয়েছে।`,
-      userId,
-      kycStatus,
+      message: `চালক KYC সফলভাবে ${result.kycStatus === 'approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} করা হয়েছে।`,
+      userId: result.userId,
+      kycStatus: result.kycStatus,
     });
   } catch (error) {
-    console.error('[admin/drivers/verify POST] Error:', error);
-    return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
+    return serverError('admin/drivers/verify POST', error);
   }
 }

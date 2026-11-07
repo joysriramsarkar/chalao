@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url    TEXT,
   role          VARCHAR(20) NOT NULL DEFAULT 'rider',  -- rider | driver | admin
   is_active     BOOLEAN NOT NULL DEFAULT true,
+  is_member     BOOLEAN NOT NULL DEFAULT false,      -- co-op shareholder
+  shares_owned  INT NOT NULL DEFAULT 0,
   emergency_contact VARCHAR(20),
   emergency_name    VARCHAR(120),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -55,7 +57,7 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
   vehicle_model   VARCHAR(60),
   vehicle_year    INT,
   vehicle_color   VARCHAR(40),
-  vehicle_type    VARCHAR(30) DEFAULT 'sedan', -- bike|auto|sedan|suv|ev
+  vehicle_type    VARCHAR(30) DEFAULT 'car', -- bike|auto|car|pink|share|green
   upi_id          VARCHAR(100),
   bank_account    VARCHAR(40),
   bank_ifsc       VARCHAR(20),
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS rides (
   rider_id            BIGINT NOT NULL REFERENCES users(id),
   driver_id           BIGINT REFERENCES users(id),
   vehicle_type        VARCHAR(30) NOT NULL DEFAULT 'sedan',
-  status              VARCHAR(30) NOT NULL DEFAULT 'requested',
+  status              VARCHAR(30) NOT NULL DEFAULT 'searching',
   -- requested|searching|offered|accepted|arrived|pickup_confirmed|ongoing|completed|cancelled|disputed
 
   pickup_lat          DOUBLE PRECISION NOT NULL,
@@ -146,6 +148,8 @@ CREATE TABLE IF NOT EXISTS earnings (
 
 CREATE INDEX IF NOT EXISTS idx_earnings_driver ON earnings(driver_id);
 CREATE INDEX IF NOT EXISTS idx_earnings_payout ON earnings(payout_status);
+-- One earning row per ride; prevents double payouts after retries.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_earnings_ride ON earnings(ride_id) WHERE ride_id IS NOT NULL;
 
 -- ─────────────────────────────────────────────
 -- SAVED ADDRESSES

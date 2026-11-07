@@ -1,59 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateToken } from '@/lib/auth';
+import { generateToken, verifyAdminCredentials } from '@/lib/auth';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const username = (body.username || '').toString().trim().toLowerCase();
-    const password = (body.password || '').toString().trim();
+    const limit = rateLimit(`admin-login:${clientIp(req)}`, 5, 15 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'অনেকবার ভুল চেষ্টা হয়েছে। ১৫ মিনিট পরে আবার চেষ্টা করুন।' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const username = String(body?.username ?? '').trim();
+    const password = String(body?.password ?? '');
 
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: 'ইউজারনেম এবং পাসওয়ার্ড উভয়ই প্রদান করুন।' },
+        { success: false, error: 'ইউজারনেম এবং পাসওয়ার্ড উভয়ই প্রদান করুন।' },
         { status: 400 }
       );
     }
 
-    // Official Chalao Admin Credentials: admin / echo123
-    if (username === 'admin' && password === 'echo123') {
-      const token = await generateToken({
-        userId: 1,
-        phone: '+91 99999 99999',
-        role: 'admin'
-      });
-
-      const response = NextResponse.json({
-        success: true,
-        message: 'অ্যাডমিন সফলভাবে লগইন হয়েছেন।',
-        token,
-        user: {
-          id: 1,
-          username: 'admin',
-          name: 'চালাও সমবায় অ্যাডমিনিস্ট্রেটর (Admin)',
-          role: 'admin',
-          permissions: ['ALL_DISPATCH', 'KYC_APPROVAL', 'PRICING_OVERRIDE', 'EMERGENCY_DISPATCH']
-        }
-      });
-
-      // Set cookie for session
-      response.cookies.set('chalao_admin_token', token, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: '/'
-      });
-
-      return response;
+    if (!verifyAdminCredentials(username, password)) {
+      return NextResponse.json(
+        { success: false, error: 'ভুল ইউজারনেম অথবা পাসওয়ার্ড!' },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json(
-      { success: false, error: 'ভুল ইউজারনেম অথবা পাসওয়ার্ড! অনুগ্রহ করে সঠিক তথ্য দিন।' },
-      { status: 401 }
+    // Short-lived admin session; userId 0 is reserved for the env-configured
+    // operator account because it has no row in `users`.
+    const token = await generateToken(
+      { userId: 0, phone: '+91 99999 99999', role: 'admin' },
+      '12h'
     );
+
+    const response = NextResponse.json({
+      success: true,
+      message: 'অ্যাডমিন সফলভাবে লগইন হয়েছেন।',
+      token,
+      user: {
+        id: 0,
+        username: username.toLowerCase(),
+        name: 'চালাও সমবায় অ্যাডমিনিস্ট্রেটর (Admin)',
+        role: 'admin',
+        permissions: ['ALL_DISPATCH', 'KYC_APPROVAL', 'PRICING_OVERRIDE', 'EMERGENCY_DISPATCH'],
+      },
+    });
+
+    response.cookies.set('chalao_admin_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 12,
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error('[admin-login] Error:', error);
     return NextResponse.json(
       { success: false, error: 'লগইন প্রক্রিয়া ব্যর্থ হয়েছে। আবার চেষ্টা করুন।' },
       { status: 500 }

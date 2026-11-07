@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { VEHICLE_OPTIONS } from '../../data/initialState';
@@ -22,6 +23,7 @@ import {
   Info, 
   Phone, 
   CheckCircle2, 
+  XCircle,
   Sparkles, 
   Banknote,
   Smartphone,
@@ -47,6 +49,7 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
     activeRide, 
     requestRide, 
     cancelRide, 
+    confirmPaymentAndReset,
     drivers,
     tripHistory,
     getVehicleOption,
@@ -61,6 +64,7 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
   const isBn = language === 'bn';
   const isHi = language === 'hi';
   const currencySymbol = getCurrencySymbol();
+  const router = useRouter();
 
   // Mobile Bottom Tab State
   const [mobileTab, setMobileTab] = useState<'ride' | 'trips' | 'coop' | 'profile'>('ride');
@@ -81,7 +85,7 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
       setPickup(availableLocations[0]);
       setDropoff(availableLocations[0]);
     }
-  }, [currentCity.id, availableLocations]);
+  }, [currentCity.id, availableLocations.length]);
 
   const vehicleOpt = getVehicleOption(selectedVehicle);
   const distanceKm = pickup && dropoff ? calculateDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) : 3.5;
@@ -334,6 +338,25 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
                       </button>
                     </div>
                   )}
+                  {activeRide.status === 'CANCELLED' && (
+                    <div className="text-center py-8 space-y-3">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-amber-500/10 border border-amber-500/40 flex items-center justify-center">
+                        <XCircle className="w-7 h-7 text-amber-400" />
+                      </div>
+                      <h3 className="text-sm font-bold text-white">
+                        {isBn ? 'কোনও চালক পাওয়া যায়নি' : 'No driver available'}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        {isBn ? 'আবার রাইড বুক করে চেষ্টা করুন।' : 'Please try booking again.'}
+                      </p>
+                      <button
+                        onClick={() => cancelRide()}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                      >
+                        {isBn ? 'আবার বুক করুন' : 'Book again'}
+                      </button>
+                    </div>
+                  )}
 
                   {(activeRide.status === 'OFFERED' || activeRide.status === 'ACCEPTED' || activeRide.status === 'ARRIVED') && (
                     <div className="space-y-4">
@@ -441,6 +464,18 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
                         <span>{isBn ? 'পরিশোধিত ভাড়া:' : 'Paid Fare:'}</span>
                         <span>{currencySymbol}{activeRide.fareAmount} ({activeRide.paymentMethod.toUpperCase()})</span>
                       </div>
+                      {activeRide.status === 'COMPLETED' ? (
+                        <button
+                          onClick={confirmPaymentAndReset}
+                          className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-xs shadow-lg"
+                        >
+                          {isBn ? 'পেমেন্ট সম্পন্ন করুন' : 'Confirm payment'}
+                        </button>
+                      ) : (
+                        <div className="text-xs font-bold text-emerald-400">
+                          {isBn ? 'পেমেন্ট সম্পন্ন হয়েছে!' : 'Payment confirmed!'}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -547,7 +582,7 @@ export const RiderApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety 
           {/* Role Switcher & Logout */}
           <div className="pt-3 border-t border-slate-800 space-y-2">
             <button
-              onClick={() => { setRole('driver'); sound.playClickSound(); }}
+              onClick={() => { setRole('driver'); sound.playClickSound(); router.push('/driver'); }}
               className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-all"
             >
               <Car className="w-4 h-4" />

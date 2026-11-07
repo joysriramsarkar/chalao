@@ -1,13 +1,25 @@
 import { neon } from '@neondatabase/serverless';
 
-const databaseUrl = process.env.DATABASE_URL; export const sql = databaseUrl ? neon(databaseUrl) : (() => { const fn = () => { throw new Error("DATABASE_URL environment variable is not set"); }; return fn; })() as any;
-// Helper: run schema migration on first request
-let migrationRun = false;
+const databaseUrl = process.env.DATABASE_URL;
+
+export const sql = databaseUrl
+  ? neon(databaseUrl, { fetchOptions: { cache: 'no-store' } })
+  : (((() => {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }) as unknown) as any);
+
+// Run the schema migration once per process. Stored as a promise so concurrent
+// first requests await the same migration instead of racing each other.
+let migrationPromise: Promise<void> | null = null;
 
 export async function runMigrations() {
-  if (migrationRun) return;
-  migrationRun = true;
-  
+  if (!migrationPromise) {
+    migrationPromise = migrate();
+  }
+  return migrationPromise;
+}
+
+async function migrate() {
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -24,6 +36,11 @@ export async function runMigrations() {
         updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+
+    // Co-op membership is persisted so the member rebate is decided by the
+    // server, not by a client-supplied flag.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_member BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS shares_owned INT NOT NULL DEFAULT 0`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS otp_logs (
@@ -90,7 +107,7 @@ export async function runMigrations() {
         rider_id            BIGINT NOT NULL REFERENCES users(id),
         driver_id           BIGINT REFERENCES users(id),
         vehicle_type        VARCHAR(30) NOT NULL DEFAULT 'sedan',
-        status              VARCHAR(30) NOT NULL DEFAULT 'requested',
+        status              VARCHAR(30) NOT NULL DEFAULT 'searching',
         pickup_lat          DOUBLE PRECISION NOT NULL,
         pickup_lng          DOUBLE PRECISION NOT NULL,
         pickup_address      TEXT NOT NULL,
@@ -145,10 +162,45 @@ export async function runMigrations() {
       )
     `;
 
+    // ── Indexes that keep the hot paths correct and fast ─────────────────
+    // OTP verification reads the newest code for a phone; dispatch filters on
+    // (status, vehicle_type); payouts scan pending earnings per driver.
+    await sql`CREATE INDEX IF NOT EXISTS idx_otp_phone_created ON otp_logs(phone, created_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_rides_searching ON rides(status, vehicle_type) WHERE status = 'searching'`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_rides_driver_status ON rides(driver_id, status)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_earnings_driver_pending ON earnings(driver_id, payout_status)`;
+
+    // Canonicalise legacy vehicle values so dispatch, pricing and the apps all
+    // speak the same vocabulary ('sedan'/'suv' -> 'car', 'ev' -> 'green').
+    await sql`UPDATE rides SET vehicle_type = 'car' WHERE vehicle_type IN ('sedan', 'suv')`;
+    await sql`UPDATE rides SET vehicle_type = 'green' WHERE vehicle_type = 'ev'`;
+    await sql`UPDATE driver_profiles SET vehicle_type = 'car' WHERE vehicle_type IN ('sedan', 'suv')`;
+    await sql`UPDATE driver_profiles SET vehicle_type = 'green' WHERE vehicle_type = 'ev'`;
+    await sql`ALTER TABLE driver_profiles ALTER COLUMN vehicle_type SET DEFAULT 'car'`;
+
+    // New rides start as 'searching'; the old default ('requested') was never
+    // written by the API and silently excluded them from dispatch queries.
+    await sql`ALTER TABLE rides ALTER COLUMN status SET DEFAULT 'searching'`;
+
+    // One earning row per completed ride. Wrapped in try/catch: legacy
+    // databases may already contain duplicates, and we refuse to delete money
+    // records automatically, so surface a warning instead of breaking every
+    // request.
+    try {
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_earnings_ride ON earnings(ride_id) WHERE ride_id IS NOT NULL`;
+    } catch (err) {
+      console.warn(
+        '[DB] Could not create uq_earnings_ride (duplicate earnings rows exist?). ' +
+          'Resolve duplicates manually before enabling the unique index.',
+        err
+      );
+    }
+
     console.log('[DB] Migrations completed successfully');
   } catch (err) {
     console.error('[DB] Migration error:', err);
-    migrationRun = false;
+    // Allow the next request to retry a failed migration.
+    migrationPromise = null;
     throw err;
   }
 }

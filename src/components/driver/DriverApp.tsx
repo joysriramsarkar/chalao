@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { getTurnByTurnDirections } from '../../services/mapService';
@@ -24,7 +25,8 @@ import {
   User,
   LogOut,
   SendHorizontal,
-  FileText
+  FileText,
+  XCircle,
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
 
@@ -44,13 +46,15 @@ export const DriverApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety
     getCurrencySymbol,
     currentCity,
     setRole,
-    logout
+    logout,
+    cancelRide,
   } = useApp();
 
   const t = TRANSLATIONS[language];
   const isBn = language === 'bn';
   const isHi = language === 'hi';
   const currencySymbol = getCurrencySymbol();
+  const router = useRouter();
 
   // Driver Mobile Tab State
   const [driverTab, setDriverTab] = useState<'cockpit' | 'earnings' | 'coop' | 'profile'>('cockpit');
@@ -219,9 +223,28 @@ export const DriverApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety
 
                 </div>
               )}
+              {activeRide?.status === 'CANCELLED' && (
+                <div className="bg-slate-900 border border-amber-500/50 rounded-2xl p-5 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/40 flex items-center justify-center">
+                    <XCircle className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white">
+                    {isBn ? 'রাইড বাতিল হয়েছে' : 'Ride cancelled'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {isBn ? 'যাত্রী রাইডটি বাতিল করেছেন অথবা অন্য চালক নিয়েছেন।' : 'The rider cancelled or another driver accepted.'}
+                  </p>
+                  <button
+                    onClick={() => cancelRide()}
+                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
+                  >
+                    {isBn ? 'ঠিক আছে' : 'Dismiss'}
+                  </button>
+                </div>
+              )}
 
               {/* Active Trip Navigation Screen */}
-              {activeRide && activeRide.status !== 'OFFERED' && activeRide.status !== 'SEARCHING' && (
+              {activeRide && !['OFFERED', 'SEARCHING', 'CANCELLED'].includes(activeRide.status) && (
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
                   
                   <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -516,7 +539,7 @@ export const DriverApp: React.FC<{ onOpenSafety: () => void }> = ({ onOpenSafety
           {/* Role Switcher & Logout */}
           <div className="pt-3 border-t border-slate-800 space-y-2">
             <button
-              onClick={() => { setRole('rider'); sound.playClickSound(); }}
+              onClick={() => { setRole('rider'); sound.playClickSound(); router.push('/rider'); }}
               className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all"
             >
               <User className="w-4 h-4" />

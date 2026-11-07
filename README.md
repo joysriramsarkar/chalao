@@ -113,3 +113,27 @@ The repository includes automated CI/CD pipelines in `.github/workflows/`:
 ## 📄 License & Governance
 Operated under Cooperative Principles & Multi-State Co-operative Societies Act, 2002.  
 © 2026 Chalao Cooperative Society Ltd. All rights reserved.
+
+---
+
+## 🔐 Security & Environment
+
+Required environment variables are documented in `.env.example`:
+
+- `DATABASE_URL` — Neon PostgreSQL connection string.
+- `JWT_SECRET` — at least 32 characters; production refuses to start sessions without it.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` — admin console credentials. The development fallback is `admin` / `echo123`; production disables login when `ADMIN_PASSWORD` is missing.
+- `CHALAO_DEV_OTP` — echoes the OTP in API responses and accepts `123456`. Defaults to on outside production, off in production.
+- `SMS_API_KEY` — required to deliver real OTPs in production.
+- `NEXT_PUBLIC_API_BASE_URL` — API origin for static/Capacitor builds.
+
+See [SECURITY.md](SECURITY.md) for the full model and the database-password
+rotation step that is still required.
+
+## 🧪 Verification
+
+```bash
+npm run typecheck   # TypeScript, no emit
+npm test            # ride pricing / validation / status-machine unit tests
+npm run build       # production Next.js build
+```

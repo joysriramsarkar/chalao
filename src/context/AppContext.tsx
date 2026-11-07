@@ -31,6 +31,7 @@ import { INDIAN_CITIES, CITY_LOCATIONS } from '../data/locations';
 import { calculateDistanceKm, estimateDurationMin, generateRoutePoints } from '../services/mapService';
 import { calculateFare } from '../services/coopEngine';
 import { sound } from '../services/audioService';
+import { apiFetch, setStoredToken, getStoredToken } from '../lib/apiClient';
 
 interface AppContextType {
   role: Role;
@@ -49,8 +50,8 @@ interface AppContextType {
   // Auth state
   isAuthenticated: boolean;
   authRole: 'rider' | 'driver' | null;
-  loginAsRider: (phone: string) => void;
-  loginAsDriver: (phone: string) => void;
+  loginAsRider: (phone: string, session?: { token?: string; name?: string }) => void;
+  loginAsDriver: (phone: string, session?: { token?: string; name?: string }) => void;
   registerDriver: (data: Partial<Driver>) => void;
   logout: () => void;
 
@@ -112,7 +113,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRoleState] = useState<Role>('admin');
+  const [role, setRoleState] = useState<Role>('rider');
   const [language, setLanguageState] = useState<Language>('bn');
   const [cityId, setCityIdState] = useState<CityId>('kolkata');
   const [currency, setCurrency] = useState<Currency>('INR');
@@ -120,8 +121,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
   // Auth state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>('admin' as any);
+  // A browser session starts signed out. The previous defaults ('admin' and
+  // isAuthenticated = true) let anyone open the rider, driver and admin pages
+  // without logging in.
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authRole, setAuthRole] = useState<'rider' | 'driver' | null>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
   const [rider, setRider] = useState<Rider>(INITIAL_RIDER);
@@ -140,10 +144,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchDriversFromDb = async () => {
     try {
       setIsRefreshing(true);
-      const res = await fetch('/api/admin/drivers');
+      const res = await apiFetch('/api/admin/drivers', {}, 'chalao_admin_token');
+      if (res.status === 401) {
+        // Expired or revoked admin token: drop the session instead of polling
+        // forever with a dead credential.
+        setStoredToken(null, 'chalao_admin_token');
+        setIsAdminAuthenticated(false);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.drivers) && data.drivers.length > 0) {
+        if (data.success && Array.isArray(data.drivers)) {
           const validVehicleTypes: VehicleType[] = ['bike', 'auto', 'car', 'pink', 'share', 'green'];
           const mappedDrivers: Driver[] = data.drivers.map((d: any) => ({
             id: d.id,
@@ -167,16 +178,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lat: d.location?.lat || 22.5726,
             lng: d.location?.lng || 88.3639,
             verificationStatus: d.verificationStatus,
-            todayEarnings: 0,
-            todayTrips: 0,
-            patronageAccrued: 0,
+            todayEarnings: d.todayEarnings,
+            todayTrips: d.todayTrips,
+            patronageAccrued: d.patronageAccrued,
             sharesOwned: 10,
             licenseNumber: d.dlNumber,
             aadhaarNumber: d.aadhaarNumber,
             panNumber: d.panNumber,
             rcNumber: d.vehicleNumber,
             upiId: d.upiId,
-            walletBalance: 1250,
+            walletBalance: d.walletBalance,
             aadhaarPhotoUrl: d.aadhaarPhotoUrl,
             panPhotoUrl: d.panPhotoUrl,
             dlPhotoUrl: d.dlPhotoUrl,
@@ -198,34 +209,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
+    // Only the admin console needs the fleet list; polling this protected
+    // endpoint from the rider/driver pages just leaked nothing but 401s.
+    if (!isAdminAuthenticated) return;
+
     fetchDriversFromDb();
-    const interval = setInterval(fetchDriversFromDb, 8000);
+    const interval = setInterval(fetchDriversFromDb, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdminAuthenticated]);
 
   const setRole = (newRole: Role) => {
     sound.playClickSound();
     setRoleState(newRole);
-    if (newRole === 'rider' || newRole === 'driver') {
-      setAuthRole(newRole);
-    }
   };
 
-  const loginAsRider = (phone: string) => {
+  const loginAsRider = (phone: string, session?: { token?: string; name?: string }) => {
     setIsAuthenticated(true);
     setAuthRole('rider');
     setRoleState('rider');
-    setRider(prev => ({ ...prev, phone: `+91 ${phone}` }));
+    setRider(prev => ({
+      ...prev,
+      phone: `+91 ${phone.replace(/^\+91\s?/, '')}`,
+      ...(session?.name ? { name: session.name } : {}),
+    }));
+    if (session?.token) setStoredToken(session.token);
+    if (typeof window !== 'undefined') localStorage.setItem('chalao_session_role', 'rider');
   };
 
-  const loginAsDriver = (phone: string) => {
+  const loginAsDriver = (phone: string, session?: { token?: string; name?: string }) => {
     setIsAuthenticated(true);
     setAuthRole('driver');
     setRoleState('driver');
-    const existing = drivers.find(d => d.phone.includes(phone));
+    const normalised = phone.replace(/[^\d]/g, '').slice(-10);
+    const existing = drivers.find(d => d.phone.replace(/[^\d]/g, '').endsWith(normalised));
     if (existing) {
       setCurrentDriverId(existing.id);
     }
+    if (session?.token) setStoredToken(session.token);
+    if (typeof window !== 'undefined') localStorage.setItem('chalao_session_role', 'driver');
   };
 
   const registerDriver = (data: Partial<Driver>) => {
@@ -247,7 +268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       memberId: `CH-IN-D${Math.floor(1000 + Math.random() * 9000)}`,
       lat: currentCity.center[0] + 0.005,
       lng: currentCity.center[1] + 0.005,
-      verificationStatus: 'verified',
+      verificationStatus: data.verificationStatus || 'pending',
       todayEarnings: 0,
       todayTrips: 0,
       patronageAccrued: 0,
@@ -271,68 +292,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sound.playClickSound();
     setIsAuthenticated(false);
     setAuthRole(null);
+    setStoredToken(null);
+    if (typeof window !== 'undefined') localStorage.removeItem('chalao_session_role');
   };
 
   useEffect(() => {
-    // Check localStorage for persisted admin session
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('chalao_admin_token');
-      const storedAuth = localStorage.getItem('chalao_admin_auth');
-      if (storedToken || storedAuth === 'true') {
-        setIsAdminAuthenticated(true);
-      }
+    if (typeof window === 'undefined') return;
+
+    // Restore an existing admin session; every API call verifies the JWT.
+    if (localStorage.getItem('chalao_admin_token')) {
+      setIsAdminAuthenticated(true);
+    }
+
+    // Restore a rider/driver session only when a token is present.
+    const sessionRole = localStorage.getItem('chalao_session_role');
+    if (getStoredToken() && (sessionRole === 'rider' || sessionRole === 'driver')) {
+      setIsAuthenticated(true);
+      setAuthRole(sessionRole);
+      setRoleState(sessionRole);
     }
   }, []);
 
-  const loginAsAdmin = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const trimmedUser = (username || '').trim().toLowerCase();
-    const trimmedPass = (password || '').trim();
-
-    // Client fallback validation for standalone Capacitor/offline mode
-    const isClientValid = trimmedUser === 'admin' && trimmedPass === 'echo123';
-
+  const loginAsAdmin = async (
+    username: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await fetch('/api/auth/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: trimmedUser, password: trimmedPass })
-      });
+      const res = await apiFetch(
+        '/api/auth/admin-login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ username: username.trim(), password }),
+        },
+        'chalao_admin_token'
+      );
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('chalao_admin_token', data.token || 'admin_jwt_session');
-            localStorage.setItem('chalao_admin_auth', 'true');
-          }
-          setIsAdminAuthenticated(true);
-          sound.playTripStartedChime();
-          return { success: true };
-        } else {
-          return { success: false, error: data.error || 'ইউজারনেম অথবা পাসওয়ার্ড ভুল!' };
-        }
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success && data.token) {
+        setStoredToken(data.token, 'chalao_admin_token');
+        if (typeof window !== 'undefined') localStorage.setItem('chalao_admin_auth', 'true');
+        setIsAdminAuthenticated(true);
+        sound.playTripStartedChime();
+        return { success: true };
       }
+
+      return {
+        success: false,
+        error:
+          data.error ||
+          (res.status === 429
+            ? 'Too many attempts. Try again later.'
+            : 'Invalid username or password.'),
+      };
     } catch (e) {
-      console.warn('Backend admin login request failed, checking client fallback:', e);
+      console.warn('Admin login request failed:', e);
+      return {
+        success: false,
+        error: 'Could not reach the server. Check the connection and API URL.',
+      };
     }
-
-    if (isClientValid) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('chalao_admin_token', 'admin_client_session');
-        localStorage.setItem('chalao_admin_auth', 'true');
-      }
-      setIsAdminAuthenticated(true);
-      sound.playTripStartedChime();
-      return { success: true };
-    }
-
-    return { success: false, error: 'ভুল ইউজারনেম অথবা পাসওয়ার্ড!' };
   };
 
   const logoutAdmin = () => {
     sound.playClickSound();
+    // Clear the httpOnly cookie server-side as well as the local token.
+    void apiFetch('/api/auth/admin-logout', { method: 'POST' }, 'chalao_admin_token').catch(() => {});
+    setStoredToken(null, 'chalao_admin_token');
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('chalao_admin_token');
       localStorage.removeItem('chalao_admin_auth');
     }
     setIsAdminAuthenticated(false);
@@ -433,6 +460,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const acceptRide = (driverId?: string) => {
+    if (!activeRide || (activeRide.status !== 'OFFERED' && activeRide.status !== 'SEARCHING')) return;
+
     const targetDriver = driverId 
       ? drivers.find(d => d.id === driverId) || currentDriver 
       : currentDriver;
@@ -451,17 +480,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const declineRide = () => {
+    if (!activeRide || activeRide.status !== 'OFFERED') return;
     sound.playClickSound();
+
+    // With no second driver available to re-dispatch to, the honest outcome is
+    // "no driver found" rather than an endless SEARCHING state.
     setActiveRide(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        status: 'SEARCHING'
+        status: 'CANCELLED'
       };
     });
   };
 
   const driverArrived = () => {
+    if (!activeRide || activeRide.status !== 'ACCEPTED') return;
     sound.playTripStartedChime();
     setActiveRide(prev => {
       if (!prev) return null;
@@ -473,7 +507,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const startTrip = (enteredOtp: string): boolean => {
-    if (!activeRide) return false;
+    if (!activeRide || activeRide.status !== 'ARRIVED') return false;
     if (enteredOtp.trim() !== activeRide.otp) {
       return false;
     }
@@ -509,7 +543,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeRide?.status]);
 
   const completeTrip = () => {
-    if (!activeRide || activeRide.status === 'COMPLETED' || activeRide.status === 'PAID') return;
+    if (!activeRide || activeRide.status !== 'ONGOING') return;
     sound.playTripCompletedFanfare();
     const completedRide = activeRide;
 
@@ -608,16 +642,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     try {
-      const res = await fetch('/api/admin/drivers/verify', {
+      const res = await apiFetch('/api/admin/drivers/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ driverId, status }),
-      });
+      }, 'chalao_admin_token');
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         await fetchDriversFromDb();
         return true;
       }
-      console.error('Driver KYC verification failed in DB:', res.status);
+      console.error('Driver KYC verification failed in DB:', res.status, data?.error || '');
       return false;
     } catch (e) {
       console.error('Error verifying driver KYC in DB:', e);

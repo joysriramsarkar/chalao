@@ -10,7 +10,6 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  Sparkles, 
   AlertCircle, 
   Layers, 
   CheckCircle2,
@@ -65,12 +64,6 @@ export const AdminAuthScreen: React.FC = () => {
     }
   };
 
-  const handleQuickFill = () => {
-    sound.playClickSound();
-    setUsername('admin');
-    setPassword('echo123');
-    setErrorMessage(null);
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 text-white relative overflow-hidden selection:bg-emerald-500 selection:text-white">
@@ -235,19 +228,14 @@ export const AdminAuthScreen: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Auto-Fill Pill */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{isBn ? 'ডেমো তথ্য অটো-ফিল করুন (admin / echo123)' : isHi ? 'डेमो ऑटो-फिल करें (admin / echo123)' : 'Auto-fill Demo (admin / echo123)'}</span>
-            </button>
-
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end text-xs">
             <span className="text-[10px] text-slate-500 font-mono">v1.0.0</span>
           </div>
+          {process.env.NODE_ENV !== 'production' && (
+            <p className="text-[10px] text-slate-500 text-center font-mono">
+              Dev: admin / echo123
+            </p>
+          )}
 
         </div>
 

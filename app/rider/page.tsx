@@ -1,22 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AppProvider, useApp } from '@/context/AppContext';
+import { useApp } from '@/context/AppContext';
 import { RiderApp } from '@/components/rider/RiderApp';
 import { Navbar } from '@/components/common/Navbar';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { SafetyModal } from '@/components/safety/SafetyModal';
 
 const RiderAppWrapper: React.FC = () => {
-  const { isAuthenticated, setRole } = useApp();
+  const { isAuthenticated, authRole, setRole } = useApp();
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
 
   React.useEffect(() => {
     setRole('rider');
   }, []);
 
-  if (!isAuthenticated) {
-    return <AuthScreen />;
+  if (!isAuthenticated || authRole !== 'rider') {
+    return <AuthScreen defaultRole="rider" />;
   }
 
   return (
@@ -31,9 +31,6 @@ const RiderAppWrapper: React.FC = () => {
 };
 
 export default function RiderPage() {
-  return (
-    <AppProvider>
-      <RiderAppWrapper />
-    </AppProvider>
-  );
+  // AppProvider already wraps the whole app in app/layout.tsx.
+  return <RiderAppWrapper />;
 }

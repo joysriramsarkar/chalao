@@ -1,22 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AppProvider, useApp } from '@/context/AppContext';
+import { useApp } from '@/context/AppContext';
 import { DriverApp } from '@/components/driver/DriverApp';
 import { Navbar } from '@/components/common/Navbar';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { SafetyModal } from '@/components/safety/SafetyModal';
 
 const DriverAppWrapper: React.FC = () => {
-  const { isAuthenticated, setRole } = useApp();
+  const { isAuthenticated, authRole, setRole } = useApp();
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
 
   React.useEffect(() => {
     setRole('driver');
   }, []);
 
-  if (!isAuthenticated) {
-    return <AuthScreen />;
+  if (!isAuthenticated || authRole !== 'driver') {
+    return <AuthScreen defaultRole="driver" />;
   }
 
   return (
@@ -31,9 +31,6 @@ const DriverAppWrapper: React.FC = () => {
 };
 
 export default function DriverPage() {
-  return (
-    <AppProvider>
-      <DriverAppWrapper />
-    </AppProvider>
-  );
+  // AppProvider already wraps the whole app in app/layout.tsx.
+  return <DriverAppWrapper />;
 }

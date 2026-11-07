@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
-import { verifyToken, extractToken } from '@/lib/auth';
+import { sql, runMigrations } from '@/lib/db';
+import { requireRole } from '@/lib/auth';
+import { isValidCoordinate, normalizeVehicleType } from '@/lib/ride';
+import { serverError, unauthorized } from '@/lib/api';
+
+export const dynamic = 'force-dynamic';
 
 // POST /api/driver/location — Update driver GPS location
 export async function POST(req: NextRequest) {
   try {
-    const token = extractToken(req);
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const payload = await verifyToken(token);
-    if (!payload || payload.role !== 'driver') {
-      return NextResponse.json({ error: 'Driver access only' }, { status: 403 });
+    const payload = await requireRole(req, 'driver');
+    if (!payload) return unauthorized('Driver access only');
+
+    await runMigrations();
+
+    const body = await req.json().catch(() => ({}));
+    const latitude = Number(body?.latitude);
+    const longitude = Number(body?.longitude);
+
+    if (!isValidCoordinate(latitude, longitude)) {
+      return NextResponse.json({ error: 'Valid latitude and longitude are required' }, { status: 400 });
     }
 
-    const { latitude, longitude, heading, speed } = await req.json();
-
-    if (!latitude || !longitude) {
-      return NextResponse.json({ error: 'Latitude and longitude required' }, { status: 400 });
-    }
+    const headingRaw = Number(body?.heading);
+    const speedRaw = Number(body?.speed);
+    const heading = Number.isFinite(headingRaw) ? Math.min(360, Math.max(0, headingRaw)) : null;
+    const speed = Number.isFinite(speedRaw) && speedRaw >= 0 ? Math.min(300, speedRaw) : null;
 
     await sql`
       INSERT INTO driver_locations (driver_id, latitude, longitude, heading, speed, updated_at)
@@ -31,22 +40,33 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[driver/location] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return serverError('driver/location POST', error);
   }
 }
 
-// GET /api/driver/location?status=online — Set online/offline and get nearby rides
+// PATCH /api/driver/location — Toggle online status and list nearby requests
 export async function PATCH(req: NextRequest) {
   try {
-    const token = extractToken(req);
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const payload = await verifyToken(token);
-    if (!payload || payload.role !== 'driver') {
-      return NextResponse.json({ error: 'Driver access only' }, { status: 403 });
-    }
+    const payload = await requireRole(req, 'driver');
+    if (!payload) return unauthorized('Driver access only');
 
-    const { isOnline } = await req.json();
+    await runMigrations();
+
+    const body = await req.json().catch(() => ({}));
+    if (typeof body?.isOnline !== 'boolean') {
+      return NextResponse.json({ error: 'isOnline must be a boolean' }, { status: 400 });
+    }
+    const isOnline = body.isOnline;
+
+    const profile = await sql`
+      SELECT kyc_status, vehicle_type FROM driver_profiles WHERE user_id = ${payload.userId}
+    `;
+    if (!profile.length) {
+      return NextResponse.json({ error: 'KYC profile not found. Complete onboarding first.' }, { status: 404 });
+    }
+    if (profile[0].kyc_status === 'rejected') {
+      return NextResponse.json({ error: 'KYC rejected. Contact support before going online.' }, { status: 403 });
+    }
 
     await sql`
       UPDATE driver_profiles
@@ -54,23 +74,23 @@ export async function PATCH(req: NextRequest) {
       WHERE user_id = ${payload.userId}
     `;
 
-    // If going online, look for pending rides nearby
-    if (isOnline) {
-      const pendingRides = await sql`
-        SELECT r.id, r.vehicle_type, r.pickup_address, r.dropoff_address,
-               r.estimated_fare, r.pickup_lat, r.pickup_lng
-        FROM rides r
-        WHERE r.status = 'searching'
-          AND r.vehicle_type = (SELECT vehicle_type FROM driver_profiles WHERE user_id = ${payload.userId})
-        ORDER BY r.created_at ASC
-        LIMIT 5
-      `;
-      return NextResponse.json({ success: true, pendingRides });
+    if (!isOnline) {
+      return NextResponse.json({ success: true, pendingRides: [] });
     }
 
-    return NextResponse.json({ success: true });
+    const vehicleType = normalizeVehicleType(profile[0].vehicle_type) || 'car';
+    const pendingRides = await sql`
+      SELECT r.id, r.vehicle_type, r.pickup_address, r.dropoff_address,
+             r.estimated_fare, r.pickup_lat, r.pickup_lng, r.distance_km, r.created_at
+      FROM rides r
+      WHERE r.status = 'searching'
+        AND r.vehicle_type = ${vehicleType}
+      ORDER BY r.created_at ASC
+      LIMIT 5
+    `;
+
+    return NextResponse.json({ success: true, pendingRides });
   } catch (error) {
-    console.error('[driver/location PATCH] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return serverError('driver/location PATCH', error);
   }
 }

@@ -1,19 +1,17 @@
 import { neon } from '@neondatabase/serverless';
-import fs from 'fs';
-import path from 'path';
 
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_64RtyULSflxa@ep-aged-rice-azw9ms8b-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.error('DATABASE_URL is required. Add it to .env.local or export it before running this script.');
+  process.exit(1);
+}
 
 const sql = neon(databaseUrl);
 
 async function run() {
   console.log('Connecting to Neon PostgreSQL...');
   try {
-    const schemaSql = fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'schema.sql'), 'utf-8');
-    
-    // Split statements by semicolon where appropriate, or execute the queries
-    console.log('Executing schema migration...');
-    
     // Users
     await sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -30,6 +28,8 @@ async function run() {
         updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_member BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS shares_owned INT NOT NULL DEFAULT 0`;
     await sql`CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`;
 
@@ -47,6 +47,7 @@ async function run() {
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_logs(phone)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_logs(expires_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_otp_phone_created ON otp_logs(phone, created_at DESC)`;
 
     // Driver profiles
     await sql`
@@ -76,6 +77,11 @@ async function run() {
         UNIQUE(user_id)
       )
     `;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS aadhaar_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS pan_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS dl_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS rc_photo_url TEXT`;
+    await sql`ALTER TABLE driver_profiles ADD COLUMN IF NOT EXISTS vehicle_photo_url TEXT`;
 
     // Driver locations
     await sql`
@@ -97,7 +103,7 @@ async function run() {
         rider_id            BIGINT NOT NULL REFERENCES users(id),
         driver_id           BIGINT REFERENCES users(id),
         vehicle_type        VARCHAR(30) NOT NULL DEFAULT 'sedan',
-        status              VARCHAR(30) NOT NULL DEFAULT 'requested',
+        status              VARCHAR(30) NOT NULL DEFAULT 'searching',
         pickup_lat          DOUBLE PRECISION NOT NULL,
         pickup_lng          DOUBLE PRECISION NOT NULL,
         pickup_address      TEXT NOT NULL,
@@ -123,9 +129,12 @@ async function run() {
         updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+    await sql`ALTER TABLE rides ALTER COLUMN status SET DEFAULT 'searching'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_rides_searching ON rides(status, vehicle_type) WHERE status = 'searching'`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_rides_driver_status ON rides(driver_id, status)`;
 
     // Earnings
     await sql`
@@ -145,6 +154,22 @@ async function run() {
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_earnings_driver ON earnings(driver_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_earnings_payout ON earnings(payout_status)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_earnings_driver_pending ON earnings(driver_id, payout_status)`;
+    await sql`UPDATE rides SET vehicle_type = 'car' WHERE vehicle_type IN ('sedan', 'suv')`;
+    await sql`UPDATE rides SET vehicle_type = 'green' WHERE vehicle_type = 'ev'`;
+    await sql`UPDATE driver_profiles SET vehicle_type = 'car' WHERE vehicle_type IN ('sedan', 'suv')`;
+    await sql`UPDATE driver_profiles SET vehicle_type = 'green' WHERE vehicle_type = 'ev'`;
+    await sql`ALTER TABLE driver_profiles ALTER COLUMN vehicle_type SET DEFAULT 'car'`;
+
+    try {
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_earnings_ride ON earnings(ride_id) WHERE ride_id IS NOT NULL`;
+    } catch (err) {
+      console.warn(
+        'Could not create uq_earnings_ride — duplicate earnings rows exist. ' +
+          'Resolve them manually, then re-run the migration.',
+        err
+      );
+    }
 
     // Saved addresses
     await sql`
@@ -160,15 +185,14 @@ async function run() {
     `;
 
     console.log('✅ Schema migration completed successfully on Neon PostgreSQL!');
-    
-    // Check existing tables
-    const tables = await sql`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-    `;
-    console.log('Current tables in Neon DB:', tables.map(t => t.table_name));
 
+    const tables = await sql`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `;
+    console.log('Current tables in Neon DB:', tables.map((t) => t.table_name));
   } catch (err) {
     console.error('Migration failed:', err);
     process.exit(1);

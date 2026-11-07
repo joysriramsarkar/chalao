@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
     "prepare:apps": "node scripts/prepare-apps.js",
     "build:all": "next build && node scripts/prepare-apps.js",
     "rider:sync": "cd apps/rider && pnpm exec cap sync",

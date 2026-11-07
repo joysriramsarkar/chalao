@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { TRANSLATIONS } from '../../data/translations';
 import { VehicleType, CityId } from '../../types';
@@ -18,8 +19,9 @@ import {
   MapPin
 } from 'lucide-react';
 import { sound } from '../../services/audioService';
+import { apiFetch, getStoredToken } from '../../lib/apiClient';
 
-export const AuthScreen: React.FC = () => {
+export const AuthScreen: React.FC<{ defaultRole?: 'rider' | 'driver' }> = ({ defaultRole = 'rider' }) => {
   const { 
     language, 
     loginAsRider, 
@@ -33,12 +35,19 @@ export const AuthScreen: React.FC = () => {
   const isBn = language === 'bn';
   const isHi = language === 'hi';
   const currencySymbol = getCurrencySymbol();
+  const router = useRouter();
+  const goToRoleApp = (role: 'rider' | 'driver') => {
+    const target = role === 'rider' ? '/rider' : '/driver';
+    if (typeof window !== 'undefined' && window.location.pathname !== target) router.push(target);
+  };
 
-  const [selectedRole, setSelectedRole] = useState<'rider' | 'driver'>('rider');
+  const [selectedRole, setSelectedRole] = useState<'rider' | 'driver'>(defaultRole);
   const [step, setStep] = useState<'phone' | 'otp' | 'driver_kyc'>('phone');
-  const [phone, setPhone] = useState('98300-99887');
-  const [otp, setOtp] = useState('1234');
-  const [otpSent, setOtpSent] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   // Driver KYC Form Fields
   const [driverName, setDriverName] = useState('শুভাশিস রায় (Subhashish Roy)');
@@ -51,40 +60,90 @@ export const AuthScreen: React.FC = () => {
   const [upiId, setUpiId] = useState('subhashish@oksbi');
   const [otpError, setOtpError] = useState(false);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const normalizedPhone = () => phone.replace(/\D/g, '').slice(-10);
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    const digits = normalizedPhone();
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      setLoginError('Enter a valid 10-digit Indian mobile number.');
+      return;
+    }
     sound.playClickSound();
-    setOtpSent(true);
+    setIsLoading(true);
+    setLoginError(null);
     setOtpError(false);
-    setStep('otp');
+    try {
+      const res = await apiFetch('/api/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: digits, role: selectedRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(data.error || 'Could not send the OTP. Please try again.');
+        return;
+      }
+      setDevOtpHint(typeof data.dev_otp === 'string' ? data.dev_otp : null);
+      setOtp(typeof data.dev_otp === 'string' ? data.dev_otp : '');
+      setStep('otp');
+    } catch (err) {
+      setLoginError('Could not reach the server. Check the connection and API URL.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate the 4-digit OTP format before entering the app
-    if (!/^\d{4}$/.test(otp.trim())) {
+    const digits = normalizedPhone();
+    if (!/^\d{6}$/.test(otp.trim())) {
       setOtpError(true);
+      setLoginError('Enter the 6-digit OTP.');
       sound.playSOSSiren();
       return;
     }
     setOtpError(false);
-    sound.playTripStartedChime();
-
-    if (selectedRole === 'rider') {
-      loginAsRider(phone);
-    } else {
-      // If driver is registering or logging in
-      loginAsDriver(phone);
+    setIsLoading(true);
+    setLoginError(null);
+    try {
+      const res = await apiFetch('/api/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: digits, otp: otp.trim(), role: selectedRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setOtpError(true);
+        setLoginError(data.error || 'OTP verification failed.');
+        return;
+      }
+      sound.playTripStartedChime();
+      if (selectedRole === 'rider') {
+        loginAsRider(digits, { token: data.token, name: data.user?.name });
+      } else {
+        loginAsDriver(digits, { token: data.token, name: data.user?.name });
+      }
+      goToRoleApp(selectedRole);
+    } catch (err) {
+      setLoginError('Could not reach the server.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleCompleteDriverKyc = (e: React.FormEvent) => {
+  const handleCompleteDriverKyc = async (e: React.FormEvent) => {
     e.preventDefault();
+    const digits = normalizedPhone();
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      setLoginError('Enter a valid 10-digit mobile number before registering.');
+      return;
+    }
+
     sound.playTripCompletedFanfare();
-    registerDriver({
+    setLoginError(null);
+
+    const payload = {
       name: driverName,
-      phone: `+91 ${phone}`,
+      phone: `+91${digits}`,
       cityId: currentCity.id,
       vehicleType,
       vehicleModel,
@@ -92,10 +151,46 @@ export const AuthScreen: React.FC = () => {
       licenseNumber,
       aadhaarNumber,
       panNumber,
-      rcNumber: `RC-${Date.now().toString().slice(-6)}`,
+      rcNumber: plateNumber.replace(/\s/g, ''),
       upiId,
-      sharesOwned: 10
-    });
+      sharesOwned: 10,
+    };
+
+    // With a real driver session the KYC documents are persisted. Otherwise
+    // fall back to the in-memory demo onboarding used by the static showcase.
+    if (!getStoredToken()) {
+      registerDriver(payload);
+      goToRoleApp('driver');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await apiFetch('/api/driver/kyc', {
+        method: 'POST',
+        body: JSON.stringify({
+          aadhaarNumber,
+          panNumber,
+          dlNumber: licenseNumber,
+          rcNumber: plateNumber.replace(/\s/g, ''),
+          vehicleType,
+          vehicleModel,
+          vehicleColor: 'White',
+          upiId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(data.error || 'KYC submission failed.');
+        return;
+      }
+      registerDriver(payload);
+      goToRoleApp('driver');
+    } catch (err) {
+      setLoginError('Could not reach the server.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -171,12 +266,18 @@ export const AuthScreen: React.FC = () => {
                 />
               </div>
               <p className="text-[10px] text-slate-500">
-                {isBn ? 'লগইন ও ভেরিফিকেশনের জন্য ৪-সংখ্যার ওটিপি পাঠানো হবে' : 'We will send a 4-digit verification code.'}
+                {isBn ? 'লগইন ও ভেরিফিকেশনের জন্য ৬-সংখ্যার ওটিপি পাঠানো হবে' : 'We will send a 6-digit verification code.'}
               </p>
+            {loginError && (
+              <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-[11px] font-semibold leading-snug">
+                {loginError}
+              </div>
+            )}
             </div>
 
             <button
               type="submit"
+              disabled={isLoading}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition-all transform active:scale-98"
             >
               <span>{isBn ? 'ওটিপি (OTP) পাঠান' : isHi ? 'ओटीपी भेजें' : 'Send Verification OTP'}</span>
@@ -205,18 +306,21 @@ export const AuthScreen: React.FC = () => {
                 <KeyRound className="w-6 h-6 animate-pulse" />
               </div>
               <h3 className="text-sm font-bold text-white">
-                {isBn ? 'ওটিপি যাচাইকরণ (OTP Verification)' : 'Enter 4-Digit Code'}
+                {isBn ? 'ওটিপি যাচাইকরণ (OTP Verification)' : 'Enter 6-Digit Code'}
               </h3>
               <p className="text-xs text-slate-400">
-                {isBn ? `+91 ${phone} নম্বরে ৪-সংখ্যার কোড পাঠানো হয়েছে` : isHi ? `+91 ${phone} नंबर पर ४-अंकों का कोड भेजा गया है` : `A 4-digit code was sent to +91 ${phone}`}
+                {isBn ? `+91 ${phone} নম্বরে ৬-সংখ্যার কোড পাঠানো হয়েছে` : isHi ? `+91 ${phone} नंबर पर ६-अंकों का कोड भेजा गया है` : `A 6-digit code was sent to +91 ${phone}`}
               </p>
+              {devOtpHint && (
+                <p className="text-[10px] text-amber-400 font-mono">DEV OTP: {devOtpHint}</p>
+              )}
             </div>
 
             <div className="py-2">
               <input
                 type="text"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={6}
                 required
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/[^\d]/g, ''))}
@@ -224,14 +328,20 @@ export const AuthScreen: React.FC = () => {
               />
               {otpError && (
                 <div className="mt-2 text-[11px] text-red-400 font-semibold">
-                  {isBn ? 'সঠিক ৪-সংখ্যার সংখ্যাগত কোড লিখুন।' : isHi ? 'कृपया सही ४-अंकों का संख्यात्मक कोड दर्ज करें।' : 'Please enter a valid 4-digit numeric code.'}
+                  {isBn ? 'সঠিক ৬-সংখ্যার সংখ্যাগত কোড লিখুন।' : isHi ? 'कृपया सही ६-अंकों का संख्यात्मक कोड दर्ज करें।' : 'Please enter a valid 6-digit numeric code.'}
                 </div>
               )}
+            {loginError && (
+              <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-[11px] font-semibold leading-snug">
+                {loginError}
+              </div>
+            )}
             </div>
 
             <div className="space-y-2">
               <button
                 type="submit"
+              disabled={isLoading}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition-all"
               >
                 <CheckCircle2 className="w-4 h-4" />
@@ -380,6 +490,7 @@ export const AuthScreen: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
+                disabled={isLoading}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition-all"
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />

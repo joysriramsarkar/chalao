@@ -32,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefre
     availableCities, 
     isMuted, 
     setIsMuted,
+    role,
   } = useApp();
 
   const t = TRANSLATIONS[language];
@@ -52,12 +53,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSafety, onRefresh, isRefre
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent">
-                  {isBn ? 'চালাও অ্যাডমিন ও ফ্লিট সেন্টার' : isHi ? 'चलाओ व्यवस्थापक व नियंत्रण' : 'Chalao Admin & Operations'}
+                  {role === 'rider'
+                    ? (isBn ? 'চালাও রাইডার অ্যাপ' : isHi ? 'चलाओ राइडर ऐप' : 'Chalao Rider')
+                    : role === 'driver'
+                      ? (isBn ? 'চালাও চালক ককপিট' : isHi ? 'चलाओ चालक कॉकपिट' : 'Chalao Driver Cockpit')
+                      : (isBn ? 'চালাও অ্যাডমিন ও ফ্লিট সেন্টার' : isHi ? 'चलाओ व्यवस्थापक व नियंत्रण' : 'Chalao Admin & Operations')}
                 </h1>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
-                  <Database className="w-2.5 h-2.5 text-emerald-400" />
-                  <span>Neon DB</span>
-                </span>
+                {(role === 'admin' || role === 'member') && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                    <Database className="w-2.5 h-2.5 text-emerald-400" />
+                    <span>Neon DB</span>
+                  </span>
+                )}
               </div>
 
               {/* City Switcher Pill */}

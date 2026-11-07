@@ -1,44 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
-import { verifyToken, extractToken } from '@/lib/auth';
+import { sql, runMigrations } from '@/lib/db';
+import { requireAuth, requireRole } from '@/lib/auth';
+import {
+  normalizeVehicleType,
+  isValidCoordinate,
+  estimateDistanceKm,
+  estimateDurationMin,
+  calculateRideFare,
+} from '@/lib/ride';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
+import { serverError, unauthorized } from '@/lib/api';
 
-// Fare calculation (transparent co-op model)
-function calculateFare(vehicleType: string, distanceKm: number): number {
-  const rates: Record<string, { base: number; perKm: number }> = {
-    bike:  { base: 15, perKm: 8 },
-    auto:  { base: 25, perKm: 12 },
-    sedan: { base: 40, perKm: 16 },
-    suv:   { base: 60, perKm: 22 },
-    ev:    { base: 35, perKm: 14 },
-    pink:  { base: 40, perKm: 16 },
-  };
-  const rate = rates[vehicleType] || rates.sedan;
-  return Math.ceil(rate.base + rate.perKm * distanceKm);
-}
+export const dynamic = 'force-dynamic';
+
+const PAYMENT_METHODS = ['cash', 'upi', 'wallet', 'card'] as const;
 
 function generateOtpPin(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return (1000 + (bytes[0] % 9000)).toString();
 }
 
 // POST /api/rides — Create a new ride request
 export async function POST(req: NextRequest) {
   try {
-    const token = extractToken(req);
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const payload = await requireRole(req, 'rider');
+    if (!payload) return unauthorized('Only authenticated riders can request rides');
 
-    const payload = await verifyToken(token);
-    if (!payload || payload.role !== 'rider') {
-      return NextResponse.json({ error: 'Only riders can request rides' }, { status: 403 });
+    const limit = rateLimit(`rides:create:${payload.userId}`, 8, 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'অনেকবার রাইড অনুরোধ করা হয়েছে। এক মিনিট পরে আবার চেষ্টা করুন।' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      );
     }
 
-    const { vehicleType, pickupLat, pickupLng, pickupAddress, dropoffLat, dropoffLng, dropoffAddress, paymentMethod, distanceKm } = await req.json();
+    await runMigrations();
 
-    if (!pickupLat || !pickupLng || !dropoffLat || !dropoffLng) {
-      return NextResponse.json({ error: 'Pickup and dropoff coordinates are required' }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const {
+      vehicleType,
+      pickupLat,
+      pickupLng,
+      pickupAddress,
+      dropoffLat,
+      dropoffLng,
+      dropoffAddress,
+      paymentMethod,
+    } = body;
+
+    const canonicalVehicle = normalizeVehicleType(vehicleType);
+    if (!canonicalVehicle) {
+      return NextResponse.json({ error: 'Unsupported vehicle type' }, { status: 400 });
     }
 
-    const distance = distanceKm || 5; // fallback
-    const estimatedFare = calculateFare(vehicleType || 'sedan', distance);
+    if (!isValidCoordinate(pickupLat, pickupLng) || !isValidCoordinate(dropoffLat, dropoffLng)) {
+      return NextResponse.json({ error: 'Valid pickup and dropoff coordinates are required' }, { status: 400 });
+    }
+
+    const method = PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : 'cash';
+
+    // Distance and fare are computed on the server from coordinates. The client
+    // value is ignored so a tampered request cannot choose its own price.
+    const distance = estimateDistanceKm(
+      Number(pickupLat),
+      Number(pickupLng),
+      Number(dropoffLat),
+      Number(dropoffLng)
+    );
+    const duration = estimateDurationMin(distance);
+
+    const riderRows = await sql`SELECT is_member FROM users WHERE id = ${payload.userId}`;
+    const isMember = Boolean(riderRows[0]?.is_member);
+    const fare = calculateRideFare(canonicalVehicle, distance, duration, isMember);
+
+    // Reject a second active ride for the same rider.
+    const active = await sql`
+      SELECT id FROM rides
+      WHERE rider_id = ${payload.userId}
+        AND status IN ('searching', 'accepted', 'arrived', 'ongoing')
+      LIMIT 1
+    `;
+    if (active.length) {
+      return NextResponse.json(
+        { error: 'আপনার একটি সক্রিয় রাইড ইতিমধ্যে চলছে।', rideId: active[0].id },
+        { status: 409 }
+      );
+    }
+
     const riderOtpPin = generateOtpPin();
 
     const result = await sql`
@@ -46,12 +95,12 @@ export async function POST(req: NextRequest) {
         rider_id, vehicle_type, status,
         pickup_lat, pickup_lng, pickup_address,
         dropoff_lat, dropoff_lng, dropoff_address,
-        estimated_fare, distance_km, payment_method, rider_otp_pin
+        estimated_fare, distance_km, duration_mins, payment_method, rider_otp_pin
       ) VALUES (
-        ${payload.userId}, ${vehicleType || 'sedan'}, 'searching',
-        ${pickupLat}, ${pickupLng}, ${pickupAddress || 'Pickup location'},
-        ${dropoffLat}, ${dropoffLng}, ${dropoffAddress || 'Dropoff location'},
-        ${estimatedFare}, ${distance}, ${paymentMethod || 'cash'}, ${riderOtpPin}
+        ${payload.userId}, ${canonicalVehicle}, 'searching',
+        ${Number(pickupLat)}, ${Number(pickupLng)}, ${String(pickupAddress || 'Pickup location').slice(0, 500)},
+        ${Number(dropoffLat)}, ${Number(dropoffLng)}, ${String(dropoffAddress || 'Dropoff location').slice(0, 500)},
+        ${fare.grossFare}, ${distance}, ${duration}, ${method}, ${riderOtpPin}
       )
       RETURNING *
     `;
@@ -62,60 +111,66 @@ export async function POST(req: NextRequest) {
       ride: {
         id: ride.id,
         status: ride.status,
-        vehicleType: ride.vehicle_type,
+        vehicleType: canonicalVehicle,
         pickupAddress: ride.pickup_address,
         dropoffAddress: ride.dropoff_address,
-        estimatedFare: ride.estimated_fare,
-        distanceKm: ride.distance_km,
+        estimatedFare: Number(ride.estimated_fare),
+        riderPayable: fare.riderPayable,
+        driverEarnings: fare.driverNet,
+        platformFee: fare.platformFee,
+        memberRebate: fare.memberRebate,
+        distanceKm: Number(ride.distance_km),
+        durationMin: ride.duration_mins,
         paymentMethod: ride.payment_method,
-        riderOtpPin: ride.rider_otp_pin, // shown to rider
+        riderOtpPin: ride.rider_otp_pin,
         createdAt: ride.created_at,
       },
     });
   } catch (error) {
-    console.error('[rides POST] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return serverError('rides POST', error);
   }
 }
 
-// GET /api/rides — Get user's ride history
+// GET /api/rides — Ride history for the signed-in user
 export async function GET(req: NextRequest) {
   try {
-    const token = extractToken(req);
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const token = await requireAuth(req);
+    if (!token) return unauthorized();
 
-    const payload = await verifyToken(token);
-    if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    await runMigrations();
 
     const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get('limit') || '20');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const parsedLimit = Number.parseInt(url.searchParams.get('limit') || '20', 10);
+    const parsedOffset = Number.parseInt(url.searchParams.get('offset') || '0', 10);
+    const limit = Math.min(100, Math.max(1, Number.isFinite(parsedLimit) ? parsedLimit : 20));
+    const offset = Math.max(0, Number.isFinite(parsedOffset) ? parsedOffset : 0);
 
     let rides;
-    if (payload.role === 'rider') {
+    if (token.role === 'rider') {
       rides = await sql`
-        SELECT r.*, 
+        SELECT r.*,
                u.name as driver_name, u.phone as driver_phone,
                dp.vehicle_make, dp.vehicle_model, dp.vehicle_color, dp.rating as driver_rating
         FROM rides r
         LEFT JOIN users u ON u.id = r.driver_id
         LEFT JOIN driver_profiles dp ON dp.user_id = r.driver_id
-        WHERE r.rider_id = ${payload.userId}
+        WHERE r.rider_id = ${token.userId}
         ORDER BY r.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
-    } else if (payload.role === 'driver') {
+    } else if (token.role === 'driver') {
       rides = await sql`
         SELECT r.*,
                u.name as rider_name, u.phone as rider_phone
         FROM rides r
         LEFT JOIN users u ON u.id = r.rider_id
-        WHERE r.driver_id = ${payload.userId}
+        WHERE r.driver_id = ${token.userId}
         ORDER BY r.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
+      // The driver must not be able to read the rider's pickup PIN in advance.
+      rides = rides.map((ride: any) => ({ ...ride, rider_otp_pin: null }));
     } else {
-      // admin
       rides = await sql`
         SELECT r.*,
                ur.name as rider_name,
@@ -130,7 +185,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ rides });
   } catch (error) {
-    console.error('[rides GET] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return serverError('rides GET', error);
   }
 }

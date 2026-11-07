@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AppProvider, useApp } from '@/context/AppContext';
+import { useApp } from '@/context/AppContext';
 import { AdminPortal } from '@/components/admin/AdminPortal';
 import { AdminAuthScreen } from '@/components/admin/AdminAuthScreen';
 import { Navbar } from '@/components/common/Navbar';
@@ -37,9 +37,6 @@ const AdminAppWrapper: React.FC = () => {
 };
 
 export default function AdminPage() {
-  return (
-    <AppProvider>
-      <AdminAppWrapper />
-    </AppProvider>
-  );
+  // AppProvider already wraps the whole app in app/layout.tsx.
+  return <AdminAppWrapper />;
 }

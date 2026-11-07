@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, runMigrations } from '@/lib/db';
+import { requireRole } from '@/lib/auth';
+import { serverError, unauthorized } from '@/lib/api';
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
-
-// GET /api/admin/stats — Return real-time platform statistics from Neon DB
+// GET /api/admin/stats — Real-time platform statistics (admin only)
 export async function GET(req: NextRequest) {
   try {
+    const payload = await requireRole(req, 'admin');
+    if (!payload) return unauthorized('Admin authentication required');
+
     await runMigrations();
 
-    const [
-      driverCounts,
-      rideCounts,
-      earningsCounts,
-    ] = await Promise.all([
+    const [driverCounts, rideCounts, earningsCounts] = await Promise.all([
       sql`
         SELECT 
           COUNT(*)::int AS total_drivers,
@@ -27,17 +27,18 @@ export async function GET(req: NextRequest) {
       sql`
         SELECT 
           COUNT(*)::int AS total_rides,
-          COUNT(CASE WHEN status = 'ongoing' THEN 1 END)::int AS active_rides,
+          COUNT(CASE WHEN status IN ('accepted', 'arrived', 'ongoing') THEN 1 END)::int AS active_rides,
           COUNT(CASE WHEN status = 'completed' THEN 1 END)::int AS completed_rides,
-          COALESCE(SUM(final_fare), 0)::numeric AS total_gmv
+          COALESCE(SUM(CASE WHEN status = 'completed' THEN final_fare ELSE 0 END), 0)::numeric AS total_gmv
         FROM rides
       `,
       sql`
         SELECT 
           COALESCE(SUM(commission_amt), 0)::numeric AS total_commission,
-          COALESCE(SUM(net_amount), 0)::numeric AS total_payouts
+          COALESCE(SUM(net_amount), 0)::numeric AS total_payouts,
+          COALESCE(SUM(CASE WHEN payout_status = 'pending' THEN net_amount ELSE 0 END), 0)::numeric AS pending_payouts
         FROM earnings
-      `
+      `,
     ]);
 
     const d = driverCounts[0] || {};
@@ -57,10 +58,10 @@ export async function GET(req: NextRequest) {
         totalGmv: Number(r.total_gmv || 0),
         totalCommission: Number(e.total_commission || 0),
         totalPayouts: Number(e.total_payouts || 0),
-      }
+        pendingPayouts: Number(e.pending_payouts || 0),
+      },
     });
   } catch (error) {
-    console.error('[admin/stats GET] Error:', error);
-    return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
+    return serverError('admin/stats GET', error);
   }
 }
