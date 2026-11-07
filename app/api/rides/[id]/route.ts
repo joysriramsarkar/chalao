@@ -151,6 +151,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     if (status === 'accepted') {
+      if (actor !== 'driver') {
+        // Admin tokens have no driver row; assigning userId 0 would violate
+        // the rides.driver_id foreign key.
+        return forbidden('Only a driver can accept a ride');
+      }
+
       // Atomic claim: two drivers accepting the same ride can no longer both
       // receive a success response.
       const claimed = await sql`

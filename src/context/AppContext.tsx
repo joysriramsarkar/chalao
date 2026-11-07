@@ -449,7 +449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setTimeout(() => {
       setActiveRide(prev => {
-        if (!prev || prev.status !== 'SEARCHING') return prev;
+        if (!prev || prev.id !== newRide.id || prev.status !== 'SEARCHING') return prev;
         sound.playRideOfferPing();
         return {
           ...prev,
