@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
@@ -17,6 +18,8 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
   String _paymentMethod = 'cash';
   bool _isLoading = false;
   bool _initialized = false;
+  num? _quotedFare;
+  num? _quotedDistanceKm;
 
   final _paymentMethods = [
     {'id': 'cash', 'icon': '💵', 'name': 'নগদ'},
@@ -30,15 +33,62 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
     if (!_initialized) {
       _args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       _initialized = true;
+      _loadQuote();
+    }
+  }
+
+  double _localDistanceKm(double lat1, double lng1, double lat2, double lng2) {
+    const earthRadiusKm = 6371.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLng = (lng2 - lng1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    final km = earthRadiusKm * c * 1.3;
+    return math.max(1, (km * 10).round() / 10).toDouble();
+  }
+
+  Future<void> _loadQuote() async {
+    try {
+      final pickupLat = (_args['pickupLat'] as num).toDouble();
+      final pickupLng = (_args['pickupLng'] as num).toDouble();
+      final result = await ApiService.quoteRide(
+        vehicleType: _args['vehicleType'] as String? ?? 'sedan',
+        pickupLat: pickupLat,
+        pickupLng: pickupLng,
+        dropoffLat: pickupLat + 0.05,
+        dropoffLng: pickupLng + 0.05,
+      );
+      final quote = result['quote'] as Map<String, dynamic>?;
+      if (!mounted || quote == null) return;
+      setState(() {
+        _quotedFare = num.tryParse('${quote['riderPayable']}');
+        _quotedDistanceKm = num.tryParse('${quote['distanceKm']}');
+      });
+    } catch (_) {
+      // Fall back to the local tariff below; the server remains authoritative.
     }
   }
 
   double _estimateFare(String vehicleType, double distanceKm) {
-    final rates = {'bike': 8.0, 'auto': 12.0, 'sedan': 16.0, 'suv': 22.0, 'ev': 14.0, 'pink': 16.0};
-    final base = {'bike': 15.0, 'auto': 25.0, 'sedan': 40.0, 'suv': 60.0, 'ev': 35.0, 'pink': 40.0};
-    final perKm = rates[vehicleType] ?? 16;
-    final b = base[vehicleType] ?? 40;
-    return (b + perKm * distanceKm).ceilToDouble();
+    const rates = <String, List<double>>{
+      'bike': [25, 9, 0.5],
+      'auto': [35, 12, 0.8],
+      'car': [70, 18, 1.5],
+      'sedan': [70, 18, 1.5],
+      'suv': [70, 18, 1.5],
+      'pink': [30, 11, 0.6],
+      'share': [20, 7, 0.4],
+      'green': [30, 10, 0.5],
+      'ev': [30, 10, 0.5],
+    };
+    final rate = rates[vehicleType] ?? const [70, 18, 1.5];
+    final durationMin = math.max(4, ((distanceKm / 22) * 60 + 3).round());
+    return (rate[0] + (distanceKm * rate[1]).round() + (durationMin * rate[2]).round())
+        .toDouble();
   }
 
   Future<void> _bookRide() async {
@@ -50,10 +100,9 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      // Simple distance estimate (production: use routing API)
-      const distanceKm = 5.0;
       final pickupLat = (_args['pickupLat'] as num).toDouble();
       final pickupLng = (_args['pickupLng'] as num).toDouble();
+      final distanceKm = _localDistanceKm(pickupLat, pickupLng, pickupLat + 0.05, pickupLng + 0.05);
       final result = await ApiService.requestRide(
         vehicleType: _args['vehicleType'] as String? ?? 'sedan',
         pickupLat: pickupLat,
@@ -86,7 +135,11 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final vehicleType = _args['vehicleType'] as String? ?? 'sedan';
-    final fare = _estimateFare(vehicleType, 5.0);
+    final pickupLat = (_args['pickupLat'] as num).toDouble();
+    final pickupLng = (_args['pickupLng'] as num).toDouble();
+    final localDistance = _localDistanceKm(pickupLat, pickupLng, pickupLat + 0.05, pickupLng + 0.05);
+    final distanceKm = _quotedDistanceKm ?? localDistance;
+    final fare = _quotedFare ?? _estimateFare(vehicleType, localDistance);
     final vehicleIcons = {'bike': '🏍️', 'auto': '🛺', 'sedan': '🚗', 'suv': '🚙', 'ev': '⚡', 'pink': '🌸'};
     final vehicleNames = {'bike': 'বাইক', 'auto': 'অটো', 'sedan': 'সেডান', 'suv': 'SUV', 'ev': 'গ্রিন EV', 'pink': 'Pink'};
 
@@ -151,7 +204,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(vehicleNames[vehicleType] ?? 'সেডান', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        const Text('আনুমানিক ৫ কিমি · ১৫-২০ মিনিট', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text('আনুমানিক ${distanceKm.toStringAsFixed(1)} কিমি · ১৫-২০ মিনিট', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       ]),
                     ),
                     Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -175,7 +228,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: selected ? const Color(0xFF6C3DF4).withOpacity(0.1) : const Color(0xFFF8F7FF),
+                          color: selected ? const Color(0xFF6C3DF4).withValues(alpha: 0.1) : const Color(0xFFF8F7FF),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: selected ? const Color(0xFF6C3DF4) : const Color(0xFFE2E0FF),

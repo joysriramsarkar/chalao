@@ -64,8 +64,14 @@ export async function PATCH(req: NextRequest) {
     if (!profile.length) {
       return NextResponse.json({ error: 'KYC profile not found. Complete onboarding first.' }, { status: 404 });
     }
-    if (profile[0].kyc_status === 'rejected') {
-      return NextResponse.json({ error: 'KYC rejected. Contact support before going online.' }, { status: 403 });
+    if (profile[0].kyc_status !== 'approved') {
+      return NextResponse.json(
+        {
+          error: 'KYC অনুমোদনের আগে অনলাইন হওয়া যাবে না।',
+          kycStatus: profile[0].kyc_status,
+        },
+        { status: 403 }
+      );
     }
 
     await sql`

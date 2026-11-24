@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/api_service.dart';
 
@@ -14,8 +15,8 @@ class CockpitScreen extends StatefulWidget {
 class _CockpitScreenState extends State<CockpitScreen> {
   Timer? _locationTimer;
   Timer? _rideTimer;
-  Map<String, dynamic>? _earnings;
-  bool _loadingEarnings = true;
+  Timer? _earningsTimer;
+  bool _openingIncoming = false;
   int _todayRides = 0;
   double _todayEarned = 0;
   double _pendingPayout = 0;
@@ -25,6 +26,8 @@ class _CockpitScreenState extends State<CockpitScreen> {
     super.initState();
     _loadEarnings();
     _startLocationTracking();
+    _startRidePolling();
+    _earningsTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadEarnings());
   }
 
   Future<void> _loadEarnings() async {
@@ -36,10 +39,9 @@ class _CockpitScreenState extends State<CockpitScreen> {
         _todayRides = int.tryParse(today['rides_today'].toString()) ?? 0;
         _todayEarned = double.tryParse(today['earned_today'].toString()) ?? 0;
         _pendingPayout = double.tryParse(summary['pending_payout'].toString()) ?? 0;
-        _loadingEarnings = false;
       });
     } catch (_) {
-      setState(() => _loadingEarnings = false);
+      // Earnings will be retried by the 30-second refresh timer.
     }
   }
 
@@ -48,26 +50,59 @@ class _CockpitScreenState extends State<CockpitScreen> {
       final appState = context.read<DriverAppState>();
       if (!appState.isOnline) return;
       try {
-        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
         await ApiService.updateLocation(latitude: pos.latitude, longitude: pos.longitude, speed: pos.speed);
       } catch (_) {}
     });
   }
 
+  void _startRidePolling() {
+    _rideTimer = Timer.periodic(const Duration(seconds: 10), (_) => _pollAvailableRides());
+  }
+
+  Future<void> _pollAvailableRides() async {
+    if (!mounted || _openingIncoming) return;
+    final appState = context.read<DriverAppState>();
+    if (!appState.isOnline || appState.currentRide != null || appState.incomingRide != null) {
+      return;
+    }
+
+    try {
+      final res = await ApiService.getAvailableRides();
+      final rides = res['rides'] as List?;
+      if (rides == null) return;
+
+      for (final item in rides) {
+        if (item is! Map) continue;
+        final ride = Map<String, dynamic>.from(item);
+        final id = ride['id'];
+        if (id is! int || appState.isRideOnCooldown(id)) continue;
+
+        _openingIncoming = true;
+        appState.setIncomingRide(ride);
+        if (!mounted) return;
+        try {
+          await Navigator.pushNamed(context, '/incoming-ride');
+        } finally {
+          _openingIncoming = false;
+        }
+        return;
+      }
+    } catch (_) {
+      // Offline or KYC not yet approved — retry on the next tick.
+    }
+  }
+
   Future<void> _toggleOnline(bool goOnline) async {
     try {
-      final res = await ApiService.setOnlineStatus(goOnline);
+      await ApiService.setOnlineStatus(goOnline);
+      if (!mounted) return;
       context.read<DriverAppState>().setOnline(goOnline);
       if (goOnline) {
-        final pending = res['pendingRides'] as List?;
-        if (pending != null && pending.isNotEmpty) {
-          final ride = pending.first as Map<String, dynamic>;
-          context.read<DriverAppState>().setIncomingRide(ride);
-          if (!mounted) return;
-          Navigator.pushNamed(context, '/incoming-ride');
-        }
+        await _pollAvailableRides();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('সমস্যা: $e'), backgroundColor: Colors.red),
       );
@@ -78,6 +113,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
   void dispose() {
     _locationTimer?.cancel();
     _rideTimer?.cancel();
+    _earningsTimer?.cancel();
     super.dispose();
   }
 
@@ -192,7 +228,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -200,7 +236,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('পেআউট বাকি', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
+                          Text('পেআউট বাকি', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
                           Text('₹${_pendingPayout.toStringAsFixed(0)}',
                             style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 22, fontWeight: FontWeight.bold)),
                         ]),
@@ -225,7 +261,9 @@ class _CockpitScreenState extends State<CockpitScreen> {
                   const SizedBox(width: 10),
                   _quickLink('📄', 'KYC', () => Navigator.pushNamed(context, '/kyc')),
                   const SizedBox(width: 10),
-                  _quickLink('🆘', 'SOS 112', () {}),
+                  _quickLink('🆘', 'SOS 112', () {
+                    launchUrl(Uri.parse('tel:112'));
+                  }),
                 ],
               ),
               const SizedBox(height: 20),
@@ -258,15 +296,15 @@ class _CockpitScreenState extends State<CockpitScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
         ]),
       ),
     );
@@ -299,7 +337,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
           Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
         ],
       ),

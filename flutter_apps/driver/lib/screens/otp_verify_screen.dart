@@ -104,7 +104,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(child: Text('🔐', style: TextStyle(fontSize: 32))),
@@ -112,7 +112,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               const SizedBox(height: 16),
               const Text('যাচাইকরণ কোড লিখুন', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 6),
-              Text('$_phone নম্বরে পাঠানো ৬ সংখ্যার কোড লিখুন', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+              Text('$_phone নম্বরে পাঠানো ৬ সংখ্যার কোড লিখুন', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
               if (_devOtp != null) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -171,7 +171,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.red[900]?.withOpacity(0.5),
+                    color: Colors.red[900]?.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),

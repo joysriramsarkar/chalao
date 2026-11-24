@@ -128,7 +128,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6C3DF4).withOpacity(0.1),
+                  color: const Color(0xFF6C3DF4).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(child: Text('🔒', style: TextStyle(fontSize: 32))),

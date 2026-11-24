@@ -91,7 +91,7 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF6C3DF4).withOpacity(0.1),
+              color: const Color(0xFF6C3DF4).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.settings_ethernet, color: Color(0xFF6C3DF4)),

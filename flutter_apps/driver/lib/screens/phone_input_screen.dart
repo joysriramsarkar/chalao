@@ -65,16 +65,16 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF22D3EE).withOpacity(0.1),
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.3)),
+                border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.3)),
               ),
               child: const Center(child: Text('🚖', style: TextStyle(fontSize: 32))),
             ),
             const SizedBox(height: 28),
             const Text('চালক লগইন', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 8),
-            Text('আপনার নিবন্ধিত নম্বরে OTP পাঠানো হবে', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+            Text('আপনার নিবন্ধিত নম্বরে OTP পাঠানো হবে', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
             const SizedBox(height: 36),
             TextFormField(
               controller: _ctrl,
@@ -88,7 +88,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Text('🇮🇳', style: TextStyle(fontSize: 18)),
                     const SizedBox(width: 6),
-                    Text('+91', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 15, fontWeight: FontWeight.w600)),
+                    Text('+91', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(width: 6),
                     Container(height: 20, width: 1, color: Colors.white12),
                   ]),
@@ -135,7 +135,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     child: Row(children: [
       Text(icon, style: const TextStyle(fontSize: 16)),
       const SizedBox(width: 8),
-      Text(text, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
+      Text(text, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
     ]),
   );
 }

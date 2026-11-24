@@ -69,8 +69,9 @@ or Upstash when running more than one instance.
 - UPI payouts only update the ledger — no payment gateway transfer is executed.
 - Payment capture for UPI/wallet/card is simulated; cash remains `pending` until
   collected.
-- KYC approval is recorded and visible to admins, but accepting a ride does not yet require an approved KYC status. Add that gate before a public launch.
+- KYC approval is required before a driver can go online or accept a ride; rejected drivers cannot receive dispatch.
 - The Next.js web app is a demo console; the Flutter rider/driver apps are the
   clients that use the real API.
+- Dispatch has no server-side offer ledger: a declined ride is hidden on that device for three minutes, but it can still be offered to another device. Add a rides_offers table when running more than a handful of drivers.
 - A rider's co-op membership (`users.is_member`) is stored server-side, but there
   is no purchase endpoint yet, so web demo membership does not grant an API rebate.

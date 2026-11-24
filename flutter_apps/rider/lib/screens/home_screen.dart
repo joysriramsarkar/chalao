@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final MapController _mapController = MapController();
   LatLng _currentLocation = const LatLng(22.5726, 88.3639); // Kolkata default
-  LatLng? _dropoffLocation;
+
   final _dropoffController = TextEditingController();
   String _pickupAddress = 'আপনার বর্তমান অবস্থান';
   String _selectedVehicle = 'sedan';
@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await Geolocator.requestPermission();
       }
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       if (!mounted) return;
       setState(() {
@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
-                          BoxShadow(color: const Color(0xFF6C3DF4).withOpacity(0.4), blurRadius: 12),
+                          BoxShadow(color: const Color(0xFF6C3DF4).withValues(alpha: 0.4), blurRadius: 12),
                         ],
                       ),
                       child: const Icon(Icons.my_location, color: Colors.white, size: 18),
@@ -128,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16)],
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16)],
                       ),
                       child: Row(
                         children: [
@@ -151,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12)],
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12)],
                       ),
                       child: const Icon(Icons.person_outline, color: Color(0xFF6C3DF4)),
                     ),
@@ -254,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 80,
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: selected ? (v['color'] as Color).withOpacity(0.12) : const Color(0xFFF8F7FF),
+                              color: selected ? (v['color'] as Color).withValues(alpha: 0.12) : const Color(0xFFF8F7FF),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: selected ? v['color'] as Color : const Color(0xFFE2E0FF),

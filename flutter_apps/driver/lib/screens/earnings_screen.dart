@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../main.dart';
 import '../services/api_service.dart';
 
 class EarningsScreen extends StatefulWidget {
@@ -123,7 +121,7 @@ class _EarningsScreenState extends State<EarningsScreen> with SingleTickerProvid
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,7 +162,7 @@ class _EarningsScreenState extends State<EarningsScreen> with SingleTickerProvid
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
-                        child: Text('এই সময়ে কোনো আয় নেই', style: TextStyle(color: Colors.white.withOpacity(0.4))),
+                        child: Text('এই সময়ে কোনো আয় নেই', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))),
                       ),
                     )
                   else
@@ -191,7 +189,7 @@ class _EarningsScreenState extends State<EarningsScreen> with SingleTickerProvid
                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13),
                                   overflow: TextOverflow.ellipsis),
                                 Text('ভাড়া: ₹${gross.toStringAsFixed(0)} · কমিশন: $commPct%',
-                                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
                               ]),
                             ),
                             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -200,7 +198,7 @@ class _EarningsScreenState extends State<EarningsScreen> with SingleTickerProvid
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: payoutStatus == 'paid' ? const Color(0xFF10B981).withOpacity(0.1) : Colors.amber.withOpacity(0.1),
+                                  color: payoutStatus == 'paid' ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(payoutStatus == 'paid' ? 'পরিশোধিত' : 'বাকি',
@@ -224,14 +222,14 @@ class _EarningsScreenState extends State<EarningsScreen> with SingleTickerProvid
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
         ]),
       ),
     );

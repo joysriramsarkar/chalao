@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/api_service.dart';
 import '../config/map_config.dart';
@@ -17,7 +18,6 @@ class ActiveRideScreen extends StatefulWidget {
 class _ActiveRideScreenState extends State<ActiveRideScreen> {
   Timer? _pollTimer;
   Map<String, dynamic>? _ride;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -37,10 +37,27 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       final rideData = result['ride'] as Map<String, dynamic>;
       setState(() => _ride = rideData);
       context.read<AppState>().setCurrentRide(rideData);
-      
+
+      if (rideData['status'] == 'cancelled') {
+        _pollTimer?.cancel();
+        context.read<AppState>().setCurrentRide(null);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('রাইডটি বাতিল হয়েছে।'), backgroundColor: Colors.orange),
+        );
+        Navigator.pushReplacementNamed(context, '/home');
+        return;
+      }
+
       if (rideData['status'] == 'completed') {
         _pollTimer?.cancel();
         if (mounted) Navigator.pushReplacementNamed(context, '/trip-completed', arguments: rideData);
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        _pollTimer?.cancel();
+        context.read<AppState>().logout();
+        if (mounted) Navigator.pushReplacementNamed(context, '/phone');
       }
     } catch (_) {}
   }
@@ -62,13 +79,40 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       ),
     );
     if (confirm != true || _ride == null) return;
-    await ApiService.updateRide(_ride!['id'] as int, {
-      'status': 'cancelled',
-      'cancelReason': 'Cancelled by rider',
-    });
+    try {
+      await ApiService.updateRide(_ride!['id'] as int, {
+        'status': 'cancelled',
+        'cancelReason': 'Cancelled by rider',
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    _pollTimer?.cancel();
     if (!mounted) return;
     context.read<AppState>().setCurrentRide(null);
     Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  bool _canCancel(String status) {
+    return status == 'searching' || status == 'accepted' || status == 'arrived';
+  }
+
+  Future<void> _callDriver() async {
+    final phone = _ride?['driver_phone']?.toString() ?? '';
+    if (phone.isEmpty) return;
+    try {
+      await launchUrl(Uri(scheme: 'tel', path: phone.replaceAll(' ', '')));
+    } catch (_) {}
+  }
+
+  Future<void> _callSos() async {
+    try {
+      await launchUrl(Uri.parse('tel:112'));
+    } catch (_) {}
   }
 
   String _statusLabel(String status) {
@@ -90,20 +134,20 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final driverLat = _ride?['driver_lat'] as double?;
-    final driverLng = _ride?['driver_lng'] as double?;
+    final driverLat = num.tryParse('${_ride?['driver_lat'] ?? ''}')?.toDouble();
+    final driverLng = num.tryParse('${_ride?['driver_lng'] ?? ''}')?.toDouble();
     final hasDriver = driverLat != null && driverLng != null;
     final status = _ride?['status'] as String? ?? 'searching';
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         body: Stack(
           children: [
             FlutterMap(
               options: MapOptions(
                 initialCenter: hasDriver
-                    ? LatLng(driverLat!, driverLng!)
+                    ? LatLng(driverLat, driverLng)
                     : const LatLng(22.5726, 88.3639),
                 initialZoom: 15,
               ),
@@ -116,14 +160,14 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                 if (hasDriver)
                   MarkerLayer(markers: [
                     Marker(
-                      point: LatLng(driverLat!, driverLng!),
+                      point: LatLng(driverLat, driverLng),
                       width: 48,
                       height: 48,
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10)],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10)],
                         ),
                         child: const Center(child: Text('🚗', style: TextStyle(fontSize: 26))),
                       ),
@@ -141,7 +185,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12)],
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12)],
                   ),
                   child: Row(
                     children: [
@@ -192,7 +236,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                             ]),
                           ),
                           IconButton(
-                            onPressed: () {},
+                            onPressed: _callDriver,
                             icon: const Icon(Icons.phone, color: Color(0xFF6C3DF4)),
                           ),
                         ],
@@ -232,7 +276,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: status == 'searching' ? _cancelRide : null,
+                            onPressed: _canCancel(status) ? _cancelRide : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.red,
                               side: const BorderSide(color: Colors.red),
@@ -245,7 +289,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: _callSos,
                             icon: const Icon(Icons.warning_amber, size: 18),
                             label: const Text('SOS'),
                             style: ElevatedButton.styleFrom(

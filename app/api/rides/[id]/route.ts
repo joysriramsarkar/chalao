@@ -157,6 +157,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         return forbidden('Only a driver can accept a ride');
       }
 
+      const driverKyc = await sql`
+        SELECT kyc_status, vehicle_type FROM driver_profiles WHERE user_id = ${payload.userId}
+      `;
+      if (!driverKyc.length || driverKyc[0].kyc_status !== 'approved') {
+        return NextResponse.json(
+          { error: 'KYC অনুমোদনের আগে রাইড নেওয়া যাবে না।', kycStatus: driverKyc[0]?.kyc_status ?? null },
+          { status: 403 }
+        );
+      }
+
+      const driverVehicle = normalizeVehicleType(driverKyc[0].vehicle_type);
+      const rideVehicle = normalizeVehicleType(ride.vehicle_type);
+      if (driverVehicle && rideVehicle && driverVehicle !== rideVehicle) {
+        return NextResponse.json(
+          { error: 'এই রাইড আপনার বাহনের ধরনের সঙ্গে মেলে না।' },
+          { status: 409 }
+        );
+      }
+
       // Atomic claim: two drivers accepting the same ride can no longer both
       // receive a success response.
       const claimed = await sql`

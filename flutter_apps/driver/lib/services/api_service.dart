@@ -208,6 +208,26 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // ─── Dispatch ───────────────────────────────────
+
+  static Future<Map<String, dynamic>> getAvailableRides() async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.get(
+      Uri.parse('$baseUrl/driver/available-rides'),
+      headers: await _headers(auth: true),
+    ).timeout(const Duration(seconds: 10));
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getActiveRide() async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.get(
+      Uri.parse('$baseUrl/rides/active'),
+      headers: await _headers(auth: true),
+    ).timeout(const Duration(seconds: 10));
+    return _handleResponse(response);
+  }
+
   // ─── Rides ──────────────────────────────────────
 
   static Future<Map<String, dynamic>> updateRide(int rideId, Map<String, dynamic> updates) async {

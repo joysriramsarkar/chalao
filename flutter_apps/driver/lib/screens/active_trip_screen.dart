@@ -17,10 +17,42 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   final _pinCtrl = TextEditingController();
   bool _pinVerified = false;
   bool _tripStarted = false;
+  bool _arrived = false;
+  bool _statusInitialized = false;
   bool _loading = false;
   String? _pinError;
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_statusInitialized) return;
+    _statusInitialized = true;
+    final ride = context.read<DriverAppState>().currentRide;
+    final status = ride?['status']?.toString();
+    if (status == 'arrived' || status == 'ongoing') _arrived = true;
+    if (status == 'ongoing') {
+      _pinVerified = true;
+      _tripStarted = true;
+    }
+  }
+
+  Future<void> _markArrived() async {
+    final ride = context.read<DriverAppState>().currentRide;
+    if (ride == null || _loading) return;
+    setState(() { _loading = true; _pinError = null; });
+    try {
+      await ApiService.updateRide(ride['id'] as int, {'status': 'arrived'});
+      context.read<DriverAppState>().setCurrentRide({...ride, 'status': 'arrived'});
+      if (mounted) setState(() => _arrived = true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _pinError = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _verifyPin() async {
+    if (!_arrived) return;
     final pin = _pinCtrl.text;
     final ride = context.read<DriverAppState>().currentRide;
     if (ride == null || pin.length < 4) return;
@@ -41,10 +73,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     if (ride == null) return;
     setState(() => _loading = true);
     try {
-      await ApiService.updateRide(ride['id'] as int, {
-        'status': 'completed',
-        'finalFare': ride['estimated_fare'],
-      });
+      await ApiService.updateRide(ride['id'] as int, {'status': 'completed'});
       context.read<DriverAppState>().setCurrentRide(null);
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/cockpit');
@@ -68,8 +97,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final dropoffLat = double.tryParse(ride?['dropoff_lat']?.toString() ?? '') ?? 22.5800;
     final dropoffLng = double.tryParse(ride?['dropoff_lng']?.toString() ?? '') ?? 88.3700;
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         appBar: AppBar(title: const Text('সক্রিয় যাত্রা (Cockpit)')),
         body: Column(
@@ -163,6 +192,33 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
                     // OTP PIN verification (before trip starts)
                     if (!_pinVerified) ...[
+                      if (!_arrived)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.4)),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text('🚩 পিকআপে পৌঁছেছেন?',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                              const SizedBox(height: 6),
+                              Text('পৌঁছানোর পর নিচের বোতাম চাপুন, তারপর যাত্রীর PIN দিন।',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                              const SizedBox(height: 14),
+                              ElevatedButton(
+                                onPressed: _loading ? null : _markArrived,
+                                child: _loading
+                                    ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Color(0xFF0F172A), strokeWidth: 2.5))
+                                    : const Text('পিকআপে পৌঁছেছি'),
+                              ),
+                            ],
+                          ),
+                        ),
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -179,7 +235,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             const SizedBox(height: 6),
                             Text('যাত্রা শুরুর আগে যাত্রীর অ্যাপের ৪ সংখ্যার PIN দিন',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
                             const SizedBox(height: 24),
                             Pinput(
                               length: 4,
@@ -203,7 +259,9 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                                 ),
                               ),
                               autofocus: true,
-                              onCompleted: (_) => _verifyPin(),
+                              onCompleted: (_) {
+                                if (_arrived) _verifyPin();
+                              },
                             ),
                             if (_pinError != null) ...[
                               const SizedBox(height: 12),
@@ -211,7 +269,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             ],
                             const SizedBox(height: 20),
                             ElevatedButton(
-                              onPressed: _loading ? null : _verifyPin,
+                              onPressed: _loading || !_arrived ? null : _verifyPin,
                               child: _loading
                                   ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Color(0xFF0F172A), strokeWidth: 2.5))
                                   : const Text('PIN যাচাই ও যাত্রা শুরু করুন'),
@@ -224,9 +282,9 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           children: [
@@ -242,12 +300,12 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('আনুমানিক ভাড়া', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                                    Text('আনুমানিক ভাড়া', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
                                     Text('₹${ride['estimated_fare']}',
                                       style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                                   ]),
                                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                    Text('পেমেন্ট', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                                    Text('পেমেন্ট', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
                                     Text(ride['payment_method'] as String? ?? 'cash',
                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                                   ]),

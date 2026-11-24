@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
+import '../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,6 +44,18 @@ class _SplashScreenState extends State<SplashScreen>
       if (!appState.user!.hasProfile) {
         Navigator.pushReplacementNamed(context, '/profile-setup');
       } else {
+        // Restore an in-progress ride after the app was killed.
+        try {
+          final active = await ApiService.getActiveRide();
+          final rideData = active['ride'];
+          if (rideData is Map) {
+            appState.setCurrentRide(Map<String, dynamic>.from(rideData));
+            if (!mounted) return;
+            Navigator.pushReplacementNamed(context, '/active-ride');
+            return;
+          }
+        } catch (_) {}
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       }
     } else {
@@ -83,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),
@@ -108,7 +121,7 @@ class _SplashScreenState extends State<SplashScreen>
                     'যারা চড়ে, তারাই মালিক',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
                 ],

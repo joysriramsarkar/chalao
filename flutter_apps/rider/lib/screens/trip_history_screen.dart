@@ -86,7 +86,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: const Color(0xFFE2E0FF)),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8),
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
                             ],
                           ),
                           child: Column(
@@ -113,7 +113,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: _statusColor(status).withOpacity(0.1),
+                                      color: _statusColor(status).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(_statusLabel(status),

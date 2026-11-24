@@ -65,3 +65,6 @@ flutter_apps/**/android/.kotlin/
 
 # Generated APKs
 apks/*.apk
+
+# Flutter tool state
+.flutter_tool_state

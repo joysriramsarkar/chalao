@@ -112,6 +112,25 @@ class DriverAppState extends ChangeNotifier {
 
   String get kycStatus => _driverProfile?['kyc_status'] as String? ?? 'pending';
 
+  // A declined ride should not immediately be offered again by the 10-second
+  // dispatch poll. Cooldown is intentionally client-side and short-lived.
+  final Map<int, DateTime> _declinedRides = {};
+
+  bool isRideOnCooldown(int rideId) {
+    final at = _declinedRides[rideId];
+    if (at == null) return false;
+    if (DateTime.now().difference(at).inMinutes >= 3) {
+      _declinedRides.remove(rideId);
+      return false;
+    }
+    return true;
+  }
+
+  void markRideDeclined(int rideId) {
+    _declinedRides[rideId] = DateTime.now();
+    notifyListeners();
+  }
+
   void setUser(Map<String, dynamic> user, Map<String, dynamic>? profile) {
     _user = user;
     _driverProfile = profile;
@@ -144,6 +163,7 @@ class DriverAppState extends ChangeNotifier {
     _currentRide = null;
     _incomingRide = null;
     _isOnline = false;
+    _declinedRides.clear();
     ApiService.clearToken();
     notifyListeners();
   }

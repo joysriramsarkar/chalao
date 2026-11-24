@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
@@ -26,6 +27,11 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
   void initState() {
     super.initState();
     _ride = context.read<DriverAppState>().incomingRide ?? {};
+    if (_ride.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    }
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))
       ..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.08).animate(_pulseCtrl);
@@ -35,8 +41,8 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
 
   void _playAlert() async {
     try {
-      // Play beep sound (replace with actual asset: assets/audio/ride_alert.mp3)
-      // await _player.play(AssetSource('audio/ride_alert.mp3'), volume: 1.0);
+      await SystemSound.play(SystemSoundType.alert);
+      await HapticFeedback.heavyImpact();
     } catch (_) {}
   }
 
@@ -54,15 +60,35 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
     if (_acting) return;
     _timer?.cancel();
     await _player.stop();
+    final app = context.read<DriverAppState>();
+    final id = _ride['id'];
+    if (id is! int) {
+      _decline();
+      return;
+    }
+
     setState(() => _acting = true);
     try {
-      final rideId = _ride['id'] as int;
-      await ApiService.updateRide(rideId, {'status': 'accepted'});
-      context.read<DriverAppState>().setCurrentRide(_ride);
+      await ApiService.updateRide(id, {'status': 'accepted'});
+      app.setIncomingRide(null);
+      app.setCurrentRide({..._ride, 'status': 'accepted'});
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/active-trip');
+    } on ApiException catch (e) {
+      // 409 means another driver won the ride; do not keep showing it.
+      app.markRideDeclined(id);
+      app.setIncomingRide(null);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+      Navigator.pushReplacementNamed(context, '/cockpit');
     } catch (e) {
+      if (!mounted) return;
       setState(() => _acting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('সমস্যা: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -70,7 +96,10 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
     if (_acting) return;
     _timer?.cancel();
     _player.stop();
-    context.read<DriverAppState>().setIncomingRide(null);
+    final app = context.read<DriverAppState>();
+    final id = _ride['id'];
+    if (id is int) app.markRideDeclined(id);
+    app.setIncomingRide(null);
     if (mounted) Navigator.pushReplacementNamed(context, '/cockpit');
   }
 
@@ -84,13 +113,28 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
 
   @override
   Widget build(BuildContext context) {
-    final fare = _ride['estimated_fare'];
-    final vehicleIcons = {'bike': '🏍️', 'auto': '🛺', 'sedan': '🚗', 'suv': '🚙', 'ev': '⚡'};
+    final fare = num.tryParse('${_ride['estimated_fare'] ?? ''}');
+    final earnings = num.tryParse('${_ride['driver_earnings'] ?? ''}') ??
+        (fare != null ? fare * 0.91 : null);
+    final vehicleIcons = {
+      'bike': '🏍️',
+      'auto': '🛺',
+      'car': '🚗',
+      'sedan': '🚗',
+      'suv': '🚙',
+      'ev': '⚡',
+      'green': '⚡',
+      'pink': '🌸',
+      'share': '🚕',
+    };
     final vehicleType = _ride['vehicle_type'] as String? ?? 'sedan';
     final distanceKm = _ride['distance_km'];
 
-    return WillPopScope(
-      onWillPop: () async { _decline(); return false; },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _decline();
+      },
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(
@@ -109,9 +153,9 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
+                      color: Colors.amber.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                     ),
                     child: const Text('🔔 নতুন রাইড অনুরোধ', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
                   ),
@@ -123,11 +167,11 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
                     child: Container(
                       width: 120, height: 120,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22D3EE).withOpacity(0.1),
+                        color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.4), width: 3),
+                        border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.4), width: 3),
                         boxShadow: [
-                          BoxShadow(color: const Color(0xFF22D3EE).withOpacity(0.2), blurRadius: 30, spreadRadius: 5),
+                          BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.2), blurRadius: 30, spreadRadius: 5),
                         ],
                       ),
                       child: Center(child: Text(vehicleIcons[vehicleType] ?? '🚗', style: const TextStyle(fontSize: 56))),
@@ -144,7 +188,7 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
                       color: _remaining <= 5 ? Colors.red : const Color(0xFF22D3EE),
                     ),
                   ),
-                  Text('সেকেন্ডে অটো বাতিল', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                  Text('সেকেন্ডে অটো বাতিল', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
                   const SizedBox(height: 32),
 
                   // Ride info card
@@ -161,12 +205,12 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('আনুমানিক আয়', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-                              Text(fare != null ? '₹${(fare * 0.91).toStringAsFixed(0)}' : '—',
+                              Text('আনুমানিক আয়', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                              Text(earnings != null ? '₹${earnings.toStringAsFixed(0)}' : '—',
                                 style: const TextStyle(color: Color(0xFF10B981), fontSize: 28, fontWeight: FontWeight.bold)),
                             ]),
                             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                              Text('দূরত্ব', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                              Text('দূরত্ব', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
                               Text(distanceKm != null ? '${distanceKm} কিমি' : '—',
                                 style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
                             ]),
@@ -192,9 +236,9 @@ class _IncomingRideScreenState extends State<IncomingRideScreen>
                           child: Container(
                             height: 64,
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.red.withOpacity(0.4)),
+                              border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
                             ),
                             child: const Center(child: Text('❌  প্রত্যাখ্যান', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
                           ),

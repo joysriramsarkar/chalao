@@ -137,3 +137,13 @@ npm run typecheck   # TypeScript, no emit
 npm test            # ride pricing / validation / status-machine unit tests
 npm run build       # production Next.js build
 ```
+---
+
+## 🆕 Latest development (24 Nov 2026)
+
+- **Driver dispatch**: the driver app now polls `GET /api/driver/available-rides` every 10 seconds while online, so new ride requests appear without toggling offline/online. Declined rides are hidden for 3 minutes.
+- **Trip restore**: both apps call `GET /api/rides/active` on launch, so killing the app during a trip no longer loses the ride. The driver cockpit resumes at the arrived/PIN/ongoing step.
+- **KYC gate**: a driver must be approved before going online or accepting a ride; the pending screen polls for admin approval every 20 seconds.
+- **Fare consistency**: `POST /api/rides/quote` gives the rider app the exact server fare (including member rebate), and the booking screen displays that quote.
+- **Safety actions**: rider SOS / call-driver and driver SOS now open the dialer.
+- **Quality**: `flutter analyze` reports zero issues for both mobile apps.

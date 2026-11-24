@@ -78,7 +78,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen>
                       width: 110,
                       height: 110,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Center(child: Text('✅', style: TextStyle(fontSize: 56))),
@@ -101,14 +101,14 @@ class _TripCompletedScreenState extends State<TripCompletedScreen>
                 ),
                 child: Column(
                   children: [
-                    Text('মোট ভাড়া', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+                    Text('মোট ভাড়া', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
                     Text('₹${fare.toString()}',
                       style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text('✅ পেমেন্ট সম্পন্ন', style: TextStyle(color: Colors.white, fontSize: 13)),

@@ -224,6 +224,37 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getActiveRide() async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.get(
+      Uri.parse('$baseUrl/rides/active'),
+      headers: await _headers(auth: true),
+    ).timeout(const Duration(seconds: 10));
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> quoteRide({
+    required String vehicleType,
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+  }) async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/rides/quote'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'vehicleType': vehicleType,
+        'pickupLat': pickupLat,
+        'pickupLng': pickupLng,
+        'dropoffLat': dropoffLat,
+        'dropoffLng': dropoffLng,
+      }),
+    ).timeout(const Duration(seconds: 10));
+    return _handleResponse(response);
+  }
+
   static Future<Map<String, dynamic>> updateRide(int rideId, Map<String, dynamic> updates) async {
     final baseUrl = await getBaseUrl();
     final response = await http.patch(

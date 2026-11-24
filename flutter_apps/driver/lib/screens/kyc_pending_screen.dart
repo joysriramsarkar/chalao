@@ -1,7 +1,69 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../main.dart';
+import '../services/api_service.dart';
 
-class KycPendingScreen extends StatelessWidget {
+class KycPendingScreen extends StatefulWidget {
   const KycPendingScreen({super.key});
+
+  @override
+  State<KycPendingScreen> createState() => _KycPendingScreenState();
+}
+
+class _KycPendingScreenState extends State<KycPendingScreen> {
+  Timer? _pollTimer;
+  bool _refreshing = false;
+  bool _navigated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Admins approve KYC in the web console; pick that up without a reinstall.
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _checkStatus(showMessage: false));
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus({required bool showMessage}) async {
+    if (_refreshing || _navigated) return;
+    setState(() => _refreshing = true);
+    try {
+      final res = await ApiService.getMe();
+      final user = res['user'] as Map<String, dynamic>?;
+      final profile = res['driverProfile'] as Map<String, dynamic>?;
+      if (!mounted || user == null) return;
+
+      context.read<DriverAppState>().setUser(user, profile);
+      final kyc = profile?['kyc_status']?.toString() ?? 'pending';
+
+      if (kyc == 'approved') {
+        _navigated = true;
+        _pollTimer?.cancel();
+        Navigator.pushReplacementNamed(context, '/cockpit');
+      } else if (kyc == 'rejected') {
+        _navigated = true;
+        _pollTimer?.cancel();
+        Navigator.pushReplacementNamed(context, '/kyc');
+      } else if (showMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('আপনার নথি এখনও যাচাই করা হচ্ছে।')),
+        );
+      }
+    } catch (e) {
+      if (showMessage && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('স্ট্যাটাস পাওয়া যায়নি: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,9 +79,9 @@ class KycPendingScreen extends StatelessWidget {
                 width: 110,
                 height: 110,
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
+                  color: Colors.amber.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.amber.withOpacity(0.3), width: 2),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3), width: 2),
                 ),
                 child: const Center(child: Text('⏳', style: TextStyle(fontSize: 52))),
               ),
@@ -32,14 +94,22 @@ class KycPendingScreen extends StatelessWidget {
               Text(
                 'আপনার নথিপত্র পর্যালোচনা করা হচ্ছে।\nসাধারণত ২৪-৪৮ ঘণ্টা সময় লাগে।',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 15, height: 1.6),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 15, height: 1.6),
               ),
               const SizedBox(height: 40),
               // Steps
               _step('✅', 'নিবন্ধন সম্পন্ন', true),
               _step('🔄', 'নথিপত্র যাচাই', false, isActive: true),
               _step('🚖', 'চালক সক্রিয়', false),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
+              ElevatedButton.icon(
+                onPressed: _refreshing ? null : () => _checkStatus(showMessage: true),
+                icon: _refreshing
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh),
+                label: const Text('স্ট্যাটাস রিফ্রেশ করুন'),
+              ),
+              const SizedBox(height: 32),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -74,8 +144,8 @@ class KycPendingScreen extends StatelessWidget {
           Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-              color: done ? const Color(0xFF10B981).withOpacity(0.1)
-                  : isActive ? Colors.amber.withOpacity(0.1)
+              color: done ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                  : isActive ? Colors.amber.withValues(alpha: 0.1)
                   : const Color(0xFF1E293B),
               shape: BoxShape.circle,
               border: Border.all(

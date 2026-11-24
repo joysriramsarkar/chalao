@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
+import '../services/api_service.dart';
 
 // ─── Splash Screen ──────────────────────────────────────────────────────────
 class SplashScreen extends StatefulWidget {
@@ -32,6 +33,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (state.isLoggedIn) {
       final kyc = state.kycStatus;
       if (kyc == 'approved') {
+        // Restore an in-progress trip after the app was killed.
+        try {
+          final active = await ApiService.getActiveRide();
+          final rideData = active['ride'];
+          if (rideData is Map) {
+            state.setCurrentRide(Map<String, dynamic>.from(rideData));
+            if (!mounted) return;
+            Navigator.pushReplacementNamed(context, '/active-trip');
+            return;
+          }
+        } catch (_) {}
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/cockpit');
       } else if (kyc == 'pending' || kyc == 'in_review') {
         Navigator.pushReplacementNamed(context, '/kyc-pending');
@@ -65,9 +78,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 Container(
                   width: 100, height: 100,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22D3EE).withOpacity(0.1),
+                    color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.4), width: 2),
+                    border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.4), width: 2),
                   ),
                   child: const Center(child: Text('🚖', style: TextStyle(fontSize: 48))),
                 ),
@@ -76,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 const SizedBox(height: 8),
                 const Text('চালক ককপিট', style: TextStyle(fontSize: 16, color: Color(0xFF22D3EE))),
                 const SizedBox(height: 4),
-                Text('Driver Partner App', style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5))),
+                Text('Driver Partner App', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.5))),
               ],
             ),
           ),

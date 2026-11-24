@@ -59,14 +59,14 @@ class ProfileScreen extends StatelessWidget {
             Text(user?['name']?.toString() ?? 'নাম নেই',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
             Text(user?['phone']?.toString() ?? '',
-              style: TextStyle(color: Colors.white.withOpacity(0.5))),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: _kycColor(profile?['kyc_status']).withOpacity(0.1),
+                color: _kycColor(profile?['kyc_status']).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _kycColor(profile?['kyc_status']).withOpacity(0.3)),
+                border: Border.all(color: _kycColor(profile?['kyc_status']).withValues(alpha: 0.3)),
               ),
               child: Text(_kycLabel(profile?['kyc_status']),
                 style: TextStyle(color: _kycColor(profile?['kyc_status']), fontWeight: FontWeight.w600, fontSize: 12)),
@@ -99,7 +99,7 @@ class ProfileScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,7 +164,7 @@ class ProfileScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
           Flexible(child: Text(value.isEmpty ? '—' : value,
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13),
             overflow: TextOverflow.ellipsis, textAlign: TextAlign.end)),

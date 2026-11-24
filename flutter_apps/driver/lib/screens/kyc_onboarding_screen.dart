@@ -169,7 +169,7 @@ class _KycOnboardingScreenState extends State<KycOnboardingScreen> {
                 const SizedBox(height: 10),
                 Text(
                   'ধাপ ${_page + 1}/${_pages.length}: ${_pages[_page]}',
-                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -302,7 +302,7 @@ class _KycOnboardingScreenState extends State<KycOnboardingScreen> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: hasPhoto ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFF0F172A),
+              color: hasPhoto ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF0F172A),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF475569)),
             ),
@@ -337,7 +337,7 @@ class _KycOnboardingScreenState extends State<KycOnboardingScreen> {
               label: const Text('ছবি তুলুন', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF22D3EE),
-                backgroundColor: const Color(0xFF22D3EE).withOpacity(0.1),
+                backgroundColor: const Color(0xFF22D3EE).withValues(alpha: 0.1),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -449,7 +449,7 @@ class _KycOnboardingScreenState extends State<KycOnboardingScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF22D3EE).withOpacity(0.1) : const Color(0xFF1E293B),
+                  color: selected ? const Color(0xFF22D3EE).withValues(alpha: 0.1) : const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: selected ? const Color(0xFF22D3EE) : const Color(0xFF334155)),
                 ),
@@ -502,9 +502,9 @@ class _KycOnboardingScreenState extends State<KycOnboardingScreen> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF22D3EE).withOpacity(0.05),
+            color: const Color(0xFF22D3EE).withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.2)),
+            border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.2)),
           ),
           child: const Row(children: [
             Text('💳', style: TextStyle(fontSize: 24)),
